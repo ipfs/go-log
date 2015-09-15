@@ -3,7 +3,7 @@ package log
 import (
 	"testing"
 
-	"github.com/ipfs/go-ipfs/Godeps/_workspace/src/golang.org/x/net/context"
+	"golang.org/x/net/context"
 )
 
 func TestContextContainsMetadata(t *testing.T) {

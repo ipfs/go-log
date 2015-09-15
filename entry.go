@@ -3,8 +3,7 @@ package log
 import (
 	"time"
 
-	"github.com/ipfs/go-ipfs/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/ipfs/go-ipfs/util"
+	"github.com/Sirupsen/logrus"
 )
 
 type entry struct {
@@ -32,8 +31,12 @@ func (e *entry) log() {
 	// TODO accum["level"] = level
 	accum["event"] = e.event
 	accum["system"] = e.system
-	accum["time"] = util.FormatRFC3339(time.Now())
+	accum["time"] = FormatRFC3339(time.Now())
 
 	// TODO roll our own event logger
 	logrus.WithFields(map[string]interface{}(accum)).Info(e.event)
+}
+
+func FormatRFC3339(t time.Time) string {
+	return t.UTC().Format(time.RFC3339Nano)
 }
