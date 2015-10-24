@@ -4,22 +4,22 @@ import (
 	"errors"
 	"os"
 
-	"github.com/Sirupsen/logrus"
+	logging "github.com/whyrusleeping/go-logging"
 )
 
 func init() {
 	SetupLogging()
 }
 
-var log = logrus.New()
+var ansiGray = "\033[0;37m"
+var ansiBlue = "\033[0;34m"
 
-// LogFormats is a map of formats used for our logger, keyed by name.
-// TODO: write custom TextFormatter (don't print module=name explicitly) and
-// fork logrus to add shortfile
-var LogFormats = map[string]*logrus.TextFormatter{
-	"nocolor": {DisableColors: true, FullTimestamp: true, TimestampFormat: "2006-01-02 15:04:05.000000", DisableSorting: true},
-	"color":   {DisableColors: false, FullTimestamp: true, TimestampFormat: "15:04:05:000", DisableSorting: true},
+var LogFormats = map[string]string{
+	"nocolor": "%{time:2006-01-02 15:04:05.000000} %{level} %{module} %{shortfile}: %{message}",
+	"color": ansiGray + "%{time:15:04:05.000} %{color}%{level:5.5s} " + ansiBlue +
+		"%{module:10.10s}: %{color:reset}%{message} " + ansiGray + "%{shortfile}%{color:reset}",
 }
+
 var defaultLogFormat = "color"
 
 // Logging environment variables
@@ -32,50 +32,50 @@ const (
 var ErrNoSuchLogger = errors.New("Error: No such logger")
 
 // loggers is the set of loggers in the system
-var loggers = map[string]*logrus.Entry{}
+var loggers = map[string]*logging.Logger{}
 
 // SetupLogging will initialize the logger backend and set the flags.
 func SetupLogging() {
 
-	format, ok := LogFormats[os.Getenv(envLoggingFmt)]
-	if !ok {
-		format = LogFormats[defaultLogFormat]
+	fmt := LogFormats[os.Getenv(envLoggingFmt)]
+	if fmt == "" {
+		fmt = LogFormats[defaultLogFormat]
 	}
 
-	log.Out = os.Stderr
-	log.Formatter = format
+	backend := logging.NewLogBackend(os.Stderr, "", 0)
+	logging.SetBackend(backend)
+	logging.SetFormatter(logging.MustStringFormatter(fmt))
 
-	lvl := logrus.ErrorLevel
+	lvl := logging.ERROR
 
 	if logenv := os.Getenv(envLogging); logenv != "" {
 		var err error
-		lvl, err = logrus.ParseLevel(logenv)
+		lvl, err = logging.LogLevel(logenv)
 		if err != nil {
-			log.Debugf("logrus.ParseLevel() Error: %q", err)
-			lvl = logrus.ErrorLevel // reset to ERROR, could be undefined now(?)
+
 		}
 	}
 
 	SetAllLoggers(lvl)
 }
 
-// SetDebugLogging calls SetAllLoggers with logrus.DebugLevel
+// SetDebugLogging calls SetAllLoggers with logging.DEBUG
 func SetDebugLogging() {
-	SetAllLoggers(logrus.DebugLevel)
+	SetAllLoggers(logging.DEBUG)
 }
 
-// SetAllLoggers changes the logrus.Level of all loggers to lvl
-func SetAllLoggers(lvl logrus.Level) {
-	log.Level = lvl
-	for _, logger := range loggers {
-		logger.Level = lvl
+// SetAllLoggers changes the logging.Level of all loggers to lvl
+func SetAllLoggers(lvl logging.Level) {
+	logging.SetLevel(lvl, "")
+	for n := range loggers {
+		logging.SetLevel(lvl, n)
 	}
 }
 
 // SetLogLevel changes the log level of a specific subsystem
 // name=="*" changes all subsystems
 func SetLogLevel(name, level string) error {
-	lvl, err := logrus.ParseLevel(level)
+	lvl, err := logging.LogLevel(level)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,14 @@ func SetLogLevel(name, level string) error {
 		return ErrNoSuchLogger
 	}
 
-	loggers[name].Level = lvl
+	logging.SetLevel(lvl, name)
 
 	return nil
+}
+
+func getLogger(name string) *logging.Logger {
+	log := logging.MustGetLogger(name)
+	log.ExtraCalldepth = 1
+	loggers[name] = log
+	return log
 }

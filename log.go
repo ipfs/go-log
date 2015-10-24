@@ -1,6 +1,7 @@
 package log
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -53,13 +54,12 @@ func Logger(system string) EventLogger {
 	// TODO if we would like to adjust log levels at run-time. Store this event
 	// logger in a map (just like the util.Logger impl)
 	if len(system) == 0 {
-		log.Warnf("Missing name parameter")
+		setuplog := getLogger("setup-logger")
+		setuplog.Warning("Missing name parameter")
 		system = "undefined"
 	}
-	if _, ok := loggers[system]; !ok {
-		loggers[system] = log.WithField("module", system)
-	}
-	logger := loggers[system]
+
+	logger := getLogger(system)
 
 	return &eventLogger{system: system, StandardLogger: logger}
 }
@@ -116,7 +116,24 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 		event:     event,
 	}
 
-	e.Log() // TODO replace this when leveled-logs have been implemented
+	accum := Metadata{}
+	for _, loggable := range e.loggables {
+		accum = DeepMerge(accum, loggable.Loggable())
+	}
+
+	// apply final attributes to reserved keys
+	// TODO accum["level"] = level
+	accum["event"] = e.event
+	accum["system"] = e.system
+	accum["time"] = FormatRFC3339(time.Now())
+
+	out, err := json.Marshal(accum)
+	if err != nil {
+		el.Errorf("ERROR FORMATTING EVENT ENTRY: %s", err)
+		return
+	}
+
+	WriterGroup.Write(append(out, '\n'))
 }
 
 type EventInProgress struct {
@@ -146,4 +163,8 @@ func (eip *EventInProgress) Done() {
 func (eip *EventInProgress) Close() error {
 	eip.Done()
 	return nil
+}
+
+func FormatRFC3339(t time.Time) string {
+	return t.UTC().Format(time.RFC3339Nano)
 }

@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/Sirupsen/logrus"
+	logging "github.com/whyrusleeping/go-logging"
 )
 
 // init sets up sane defaults
@@ -30,32 +30,33 @@ func Configure(options ...Option) {
 
 // LdJSONFormatter Option formats the event log as line-delimited JSON
 var LdJSONFormatter = func() {
-	logrus.SetFormatter(&PoliteJSONFormatter{})
+	logging.SetFormatter(&PoliteJSONFormatter{})
 }
 
 // TextFormatter Option formats the event log as human-readable plain-text
 var TextFormatter = func() {
-	logrus.SetFormatter(&logrus.TextFormatter{})
+	logging.SetFormatter(logging.DefaultFormatter)
 }
 
 func Output(w io.Writer) Option {
 	return func() {
-		logrus.SetOutput(w)
+		backend := logging.NewLogBackend(w, "", 0)
+		logging.SetBackend(backend)
 		// TODO return previous Output option
 	}
 }
 
 // LevelDebug Option sets the log level to debug
 var LevelDebug = func() {
-	logrus.SetLevel(logrus.DebugLevel)
+	logging.SetLevel(logging.DEBUG, "")
 }
 
-// LevelDebug Option sets the log level to error
+// LevelError Option sets the log level to error
 var LevelError = func() {
-	logrus.SetLevel(logrus.ErrorLevel)
+	logging.SetLevel(logging.ERROR, "")
 }
 
-// LevelDebug Option sets the log level to info
+// LevelInfo Option sets the log level to info
 var LevelInfo = func() {
-	logrus.SetLevel(logrus.InfoLevel)
+	logging.SetLevel(logging.INFO, "")
 }

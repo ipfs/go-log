@@ -2,19 +2,27 @@ package log
 
 import (
 	"encoding/json"
-	"fmt"
+	"io"
 
-	"github.com/Sirupsen/logrus"
+	logging "github.com/whyrusleeping/go-logging"
 )
 
 // PoliteJSONFormatter marshals entries into JSON encoded slices (without
 // overwriting user-provided keys). How polite of it!
 type PoliteJSONFormatter struct{}
 
-func (f *PoliteJSONFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	serialized, err := json.Marshal(entry.Data)
+func (f *PoliteJSONFormatter) Format(calldepth int, r *logging.Record, w io.Writer) error {
+	entry := make(map[string]interface{})
+	entry["id"] = r.Id
+	entry["level"] = r.Level
+	entry["time"] = r.Time
+	entry["module"] = r.Module
+	entry["message"] = r.Message()
+	err := json.NewEncoder(w).Encode(entry)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to marshal fields to JSON, %v", err)
+		return err
 	}
-	return append(serialized, '\n'), nil
+
+	w.Write([]byte{'\n'})
+	return nil
 }
