@@ -7,7 +7,7 @@ import (
 )
 
 // Global writer group for logs to output to
-var WriterGroup = new(MirrorWriter)
+var WriterGroup = NewMirrorWriter()
 
 type Option func()
 
