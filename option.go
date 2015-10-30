@@ -2,19 +2,9 @@ package log
 
 import (
 	"io"
-	"os"
 
 	logging "github.com/whyrusleeping/go-logging"
 )
-
-// init sets up sane defaults
-func init() {
-	Configure(TextFormatter)
-	Configure(Output(os.Stderr))
-	// has the effect of disabling logging since we log event entries at Info
-	// level by convention
-	Configure(LevelError)
-}
 
 // Global writer group for logs to output to
 var WriterGroup = new(MirrorWriter)
