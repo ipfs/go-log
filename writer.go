@@ -1,11 +1,12 @@
 package log
 
 import (
+	"fmt"
 	"io"
 	"sync"
 )
 
-var MaxWriterBuffer = 16 * 1024 * 1024
+var MaxWriterBuffer = 512 * 1024
 
 var log = Logger("eventlog")
 
@@ -17,13 +18,10 @@ type MirrorWriter struct {
 	writerAdd chan io.WriteCloser
 
 	// slices of writer/sync-channel pairs
-	writers []*writerSync
+	writers []*bufWriter
 
 	// synchronization channel for incoming writes
 	msgSync chan []byte
-
-	// channel for dead writers to notify the MirrorWriter
-	deadWriter chan io.WriteCloser
 }
 
 type writerSync struct {
@@ -33,9 +31,8 @@ type writerSync struct {
 
 func NewMirrorWriter() *MirrorWriter {
 	mw := &MirrorWriter{
-		msgSync:    make(chan []byte, 64), // sufficiently large buffer to avoid callers waiting
-		writerAdd:  make(chan io.WriteCloser),
-		deadWriter: make(chan io.WriteCloser),
+		msgSync:   make(chan []byte, 64), // sufficiently large buffer to avoid callers waiting
+		writerAdd: make(chan io.WriteCloser),
 	}
 
 	go mw.logRoutine()
@@ -48,65 +45,24 @@ func (mw *MirrorWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (mw *MirrorWriter) handleWriter(w io.WriteCloser, msgs <-chan []byte) {
-	bufsize := 0
-	bufBase := make([][]byte, 0, 16) // some initial memory
-	buffered := bufBase
-	nextCh := make(chan []byte)
-
-	var nextMsg []byte
-	var send chan []byte
-
-	go func() {
-		for b := range nextCh {
-			_, err := w.Write(b)
-			if err != nil {
-				log.Info("eventlog write error: %s", err)
-				return
-			}
-		}
-	}()
-
-	// collect and buffer messages
-	for {
-		select {
-		case b := <-msgs:
-			if len(buffered) == 0 {
-				nextMsg = b
-				send = nextCh
-			} else {
-				bufsize += len(b)
-				buffered = append(buffered, b)
-				if bufsize > MaxWriterBuffer {
-					// if we have too many messages buffered, kill the writer
-					w.Close()
-					mw.deadWriter <- w
-					close(nextCh)
-					return
-				}
-			}
-		case send <- nextMsg:
-			if len(buffered) > 0 {
-				nextMsg = buffered[0]
-				buffered = buffered[1:]
-				bufsize -= len(nextMsg)
-			}
-
-			if len(buffered) == 0 {
-				// reset slice position
-				buffered = bufBase[:0]
-
-				nextMsg = nil
-				send = nil
-			}
-		}
-	}
+func (mw *MirrorWriter) Close() error {
+	// it is up to the caller to ensure that write is not called during or
+	// after close is called.
+	close(mw.msgSync)
+	return nil
 }
 
 func (mw *MirrorWriter) logRoutine() {
+	// rebind to avoid races on nilling out struct fields
+	msgSync := mw.msgSync
+	writerAdd := mw.writerAdd
+
 	for {
 		select {
-		case b := <-mw.msgSync:
+		case b, ok := <-msgSync:
+			if !ok {
+				return
+			}
 			// write to all writers
 			dropped := mw.broadcastMessage(b)
 
@@ -114,13 +70,8 @@ func (mw *MirrorWriter) logRoutine() {
 			if dropped {
 				mw.clearDeadWriters()
 			}
-		case w := <-mw.writerAdd:
-			brchan := make(chan []byte, 1) // buffered for absent-handoffs to not cause delays
-			mw.writers = append(mw.writers, &writerSync{
-				w:  w,
-				br: brchan,
-			})
-			go mw.handleWriter(w, brchan)
+		case w := <-writerAdd:
+			mw.writers = append(mw.writers, newBufWriter(w))
 
 			mw.activelk.Lock()
 			mw.active = true
@@ -134,31 +85,10 @@ func (mw *MirrorWriter) logRoutine() {
 func (mw *MirrorWriter) broadcastMessage(b []byte) bool {
 	var dropped bool
 	for i, w := range mw.writers {
-		if w == nil {
-			// if the next writer was killed before we got
-			// to it move on
-			continue
-		}
-
-		for sending := true; sending; {
-			// loop until we send the message, or the current writer is killed
-			select {
-			case w.br <- b:
-				// success!
-				sending = false
-
-			case dw := <-mw.deadWriter:
-				// some writer was killed while waiting here
-				for j, w := range mw.writers {
-					if w.w == dw {
-						mw.writers[j] = nil
-						if i == j {
-							sending = false
-						}
-					}
-				}
-				dropped = true
-			}
+		_, err := w.Write(b)
+		if err != nil {
+			mw.writers[i] = nil
+			dropped = true
 		}
 	}
 	return dropped
@@ -188,4 +118,111 @@ func (mw *MirrorWriter) Active() (active bool) {
 	active = mw.active
 	mw.activelk.Unlock()
 	return
+}
+
+func newBufWriter(w io.WriteCloser) *bufWriter {
+	bw := &bufWriter{
+		writer:   w,
+		incoming: make(chan []byte, 1),
+	}
+
+	go bw.loop()
+	return bw
+}
+
+type bufWriter struct {
+	writer io.WriteCloser
+
+	incoming chan []byte
+
+	deathLock sync.Mutex
+	dead      bool
+}
+
+var errDeadWriter = fmt.Errorf("writer is dead")
+
+func (bw *bufWriter) Write(b []byte) (int, error) {
+	bw.deathLock.Lock()
+	dead := bw.dead
+	bw.deathLock.Unlock()
+	if dead {
+		if bw.incoming != nil {
+			close(bw.incoming)
+			bw.incoming = nil
+		}
+		return 0, errDeadWriter
+	}
+
+	bw.incoming <- b
+	return len(b), nil
+}
+
+func (bw *bufWriter) die() {
+	bw.deathLock.Lock()
+	bw.dead = true
+	bw.writer.Close()
+	bw.deathLock.Unlock()
+}
+
+func (bw *bufWriter) loop() {
+	bufsize := 0
+	bufBase := make([][]byte, 0, 16) // some initial memory
+	buffered := bufBase
+	nextCh := make(chan []byte)
+
+	var nextMsg []byte
+	var send chan []byte
+
+	go func() {
+		for b := range nextCh {
+			_, err := bw.writer.Write(b)
+			if err != nil {
+				log.Info("eventlog write error: %s", err)
+				bw.die()
+				return
+			}
+		}
+	}()
+
+	// collect and buffer messages
+	incoming := bw.incoming
+	for {
+		select {
+		case b, ok := <-incoming:
+			if !ok {
+				return
+			}
+			if len(buffered) == 0 {
+				nextMsg = b
+				send = nextCh
+			} else {
+				bufsize += len(b)
+				buffered = append(buffered, b)
+				if bufsize > MaxWriterBuffer {
+					// if we have too many messages buffered, kill the writer
+					bw.die()
+					close(nextCh)
+					// explicity keep going here to drain incoming
+				}
+			}
+		case send <- nextMsg:
+			// if 'send' is equal to nil, this case will never trigger.
+			// Taking advantage of that, when we have sent all of our buffered
+			// messages, we nil out the channel until more arrive. This way we
+			// can 'turn off' the writer until there is more to be written.
+			if len(buffered) > 0 {
+				nextMsg = buffered[0]
+				buffered = buffered[1:]
+				bufsize -= len(nextMsg)
+			}
+
+			if len(buffered) == 0 {
+				// reset slice position
+				buffered = bufBase[:0]
+
+				nextMsg = nil
+				send = nil
+			}
+		}
+	}
 }
