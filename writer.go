@@ -41,7 +41,9 @@ func NewMirrorWriter() *MirrorWriter {
 }
 
 func (mw *MirrorWriter) Write(b []byte) (int, error) {
-	mw.msgSync <- b
+	mycopy := make([]byte, len(b))
+	copy(mycopy, b)
+	mw.msgSync <- mycopy
 	return len(b), nil
 }
 
@@ -52,10 +54,18 @@ func (mw *MirrorWriter) Close() error {
 	return nil
 }
 
+func (mw *MirrorWriter) doClose() {
+	for _, w := range mw.writers {
+		w.writer.Close()
+	}
+}
+
 func (mw *MirrorWriter) logRoutine() {
 	// rebind to avoid races on nilling out struct fields
 	msgSync := mw.msgSync
 	writerAdd := mw.writerAdd
+
+	defer mw.doClose()
 
 	for {
 		select {
@@ -63,6 +73,7 @@ func (mw *MirrorWriter) logRoutine() {
 			if !ok {
 				return
 			}
+
 			// write to all writers
 			dropped := mw.broadcastMessage(b)
 
@@ -171,7 +182,6 @@ func (bw *bufWriter) loop() {
 	nextCh := make(chan []byte)
 
 	var nextMsg []byte
-	var send chan []byte
 
 	go func() {
 		for b := range nextCh {
@@ -187,29 +197,34 @@ func (bw *bufWriter) loop() {
 	// collect and buffer messages
 	incoming := bw.incoming
 	for {
+		if nextMsg == nil || nextCh == nil {
+			// nextCh == nil implies we are 'dead' and draining the incoming channel
+			// until the caller notices and closes it for us
+			select {
+			case b, ok := <-incoming:
+				if !ok {
+					return
+				}
+				nextMsg = b
+			}
+		}
+
 		select {
 		case b, ok := <-incoming:
 			if !ok {
 				return
 			}
-			if len(buffered) == 0 {
-				nextMsg = b
-				send = nextCh
-			} else {
-				bufsize += len(b)
-				buffered = append(buffered, b)
-				if bufsize > MaxWriterBuffer {
-					// if we have too many messages buffered, kill the writer
-					bw.die()
-					close(nextCh)
-					// explicity keep going here to drain incoming
-				}
+			bufsize += len(b)
+			buffered = append(buffered, b)
+			if bufsize > MaxWriterBuffer {
+				// if we have too many messages buffered, kill the writer
+				bw.die()
+				close(nextCh)
+				nextCh = nil
+				// explicity keep going here to drain incoming
 			}
-		case send <- nextMsg:
-			// if 'send' is equal to nil, this case will never trigger.
-			// Taking advantage of that, when we have sent all of our buffered
-			// messages, we nil out the channel until more arrive. This way we
-			// can 'turn off' the writer until there is more to be written.
+		case nextCh <- nextMsg:
+			nextMsg = nil
 			if len(buffered) > 0 {
 				nextMsg = buffered[0]
 				buffered = buffered[1:]
@@ -219,9 +234,6 @@ func (bw *bufWriter) loop() {
 			if len(buffered) == 0 {
 				// reset slice position
 				buffered = bufBase[:0]
-
-				nextMsg = nil
-				send = nil
 			}
 		}
 	}
