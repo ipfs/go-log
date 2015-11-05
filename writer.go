@@ -15,7 +15,7 @@ type MirrorWriter struct {
 	activelk sync.Mutex
 
 	// channel for incoming writers
-	writerAdd chan io.WriteCloser
+	writerAdd chan *writerAdd
 
 	// slices of writer/sync-channel pairs
 	writers []*bufWriter
@@ -32,7 +32,7 @@ type writerSync struct {
 func NewMirrorWriter() *MirrorWriter {
 	mw := &MirrorWriter{
 		msgSync:   make(chan []byte, 64), // sufficiently large buffer to avoid callers waiting
-		writerAdd: make(chan io.WriteCloser),
+		writerAdd: make(chan *writerAdd),
 	}
 
 	go mw.logRoutine()
@@ -81,12 +81,13 @@ func (mw *MirrorWriter) logRoutine() {
 			if dropped {
 				mw.clearDeadWriters()
 			}
-		case w := <-writerAdd:
-			mw.writers = append(mw.writers, newBufWriter(w))
+		case wa := <-writerAdd:
+			mw.writers = append(mw.writers, newBufWriter(wa.w))
 
 			mw.activelk.Lock()
 			mw.active = true
 			mw.activelk.Unlock()
+			close(wa.done)
 		}
 	}
 }
@@ -120,8 +121,18 @@ func (mw *MirrorWriter) clearDeadWriters() {
 	}
 }
 
+type writerAdd struct {
+	w    io.WriteCloser
+	done chan struct{}
+}
+
 func (mw *MirrorWriter) AddWriter(w io.WriteCloser) {
-	mw.writerAdd <- w
+	wa := &writerAdd{
+		w:    w,
+		done: make(chan struct{}),
+	}
+	mw.writerAdd <- wa
+	<-wa.done
 }
 
 func (mw *MirrorWriter) Active() (active bool) {
