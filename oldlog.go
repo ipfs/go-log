@@ -100,12 +100,10 @@ func SetLogLevel(name, level string) error {
 // GetSubsystems returns a slice containing the
 // names of the current loggers
 func GetSubsystems() []string {
-	subs := make([]string, len(loggers))
+	subs := make([]string, 0, len(loggers))
 
-	i := 0
 	for k := range loggers {
-		subs[i] = k
-		i++
+		subs = append(subs, k)
 	}
 	return subs
 }
