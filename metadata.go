@@ -4,19 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
-
-	"github.com/satori/go.uuid"
 )
 
 // Metadata is a convenience type for generic maps
 type Metadata map[string]interface{}
-
-// Uuid returns a Metadata with the string key and UUID value
-func Uuid(key string) Metadata {
-	return Metadata{
-		key: uuid.NewV4().String(),
-	}
-}
 
 // DeepMerge merges the second Metadata parameter into the first.
 // Nested Metadata are merged recursively. Primitives are over-written.

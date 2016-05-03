@@ -4,28 +4,34 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
-
-	randbo "github.com/dustin/randbo"
 )
 
 type hangwriter struct {
-	c chan struct{}
+	c      chan struct{}
+	closer *sync.Once
 }
 
 func newHangWriter() *hangwriter {
-	return &hangwriter{make(chan struct{})}
+	return &hangwriter{
+		c:      make(chan struct{}),
+		closer: new(sync.Once),
+	}
 }
 
 func (hw *hangwriter) Write([]byte) (int, error) {
-	<-make(chan struct{})
+	<-hw.c
 	return 0, fmt.Errorf("write on closed writer")
 }
 
 func (hw *hangwriter) Close() error {
-	close(hw.c)
+	hw.closer.Do(func() {
+		close(hw.c)
+	})
+
 	return nil
 }
 
@@ -135,7 +141,7 @@ func TestStress(t *testing.T) {
 		work.Add(1)
 		go func() {
 			defer work.Done()
-			r := randbo.New()
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
 			buf := make([]byte, writesize)
 			for j := 0; j < writecount; j++ {
 				r.Read(buf)
