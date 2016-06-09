@@ -230,7 +230,9 @@ func (bw *bufWriter) loop() {
 			if bufsize > MaxWriterBuffer {
 				// if we have too many messages buffered, kill the writer
 				bw.die()
-				close(nextCh)
+				if nextCh != nil {
+					close(nextCh)
+				}
 				nextCh = nil
 				// explicity keep going here to drain incoming
 			}
