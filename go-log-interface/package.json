@@ -1,0 +1,22 @@
+{
+  "author": "kubuxu",
+  "bugs": {
+    "url": "https://github.com/ipfs/go-log/issues"
+  },
+  "gx": {
+    "dvcsimport": "github.com/ipfs/go-log/go-log-interface"
+  },
+  "gxDependencies": [
+    {
+      "author": "whyrusleeping",
+      "hash": "QmZy2y8t9zQH2a1b8q2ZSLKp17ATuJoCNxxyMFG5qFExpt",
+      "name": "go-net",
+      "version": "0.0.0"
+    }
+  ],
+  "gxVersion": "0.7.0",
+  "language": "go",
+  "license": "MIT",
+  "name": "go-log-interface",
+  "version": "1.0.0"
+}
