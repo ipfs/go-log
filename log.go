@@ -1,11 +1,10 @@
 package log
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
-
-	context "golang.org/x/net/context"
 )
 
 // StandardLogger provides API compatibility with standard printf loggers

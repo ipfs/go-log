@@ -1,9 +1,8 @@
 package log
 
 import (
+	"context"
 	"testing"
-
-	"golang.org/x/net/context"
 )
 
 func TestContextContainsMetadata(t *testing.T) {

@@ -1,9 +1,8 @@
 package log
 
 import (
+	"context"
 	"errors"
-
-	"golang.org/x/net/context"
 )
 
 type key int
