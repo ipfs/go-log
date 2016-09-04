@@ -8,7 +8,9 @@
 [![Coverage Status](https://coveralls.io/repos/github/ipfs/go-log/badge.svg?branch=master)](https://coveralls.io/github/ipfs/go-log?branch=master)
 [![Build Status](https://travis-ci.org/ipfs/go-log.svg?branch=master)](https://travis-ci.org/ipfs/go-log)
 
-> A logging library used by go-ipfs
+> The logging library used by go-ipfs
+
+It currently uses a modified version of [go-logging](https://github.com/whyrusleeping/go-logging) to implement the standard printf-style log output.
 
 ## Install
 
@@ -18,7 +20,12 @@ go get github.com/ipfs/go-log
 
 ## Usage
 
-TODO
+Once the pacakge is imported under the name `logging`, an instance of `EventLogger` can be created like so:
+
+````go
+var log = logging.Logger("subsystem name")
+```
+It can then be used to emit log messages, either plain printf-style messages at six standard levels or structured messages using `Event` and `EventBegin` methods.
 
 ## Contribute
 
