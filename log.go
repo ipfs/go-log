@@ -1,3 +1,6 @@
+// Package log is the logging library used by IPFS
+// (https://github.com/ipfs/go-ipfs). It uses a modified version of
+// https://godoc.org/github.com/whyrusleeping/go-logging .
 package log
 
 import (
@@ -135,6 +138,7 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 	WriterGroup.Write(append(out, '\n'))
 }
 
+// EventInProgress represent and event which is happening
 type EventInProgress struct {
 	loggables []Loggable
 	doneFunc  func([]Loggable)
@@ -164,6 +168,7 @@ func (eip *EventInProgress) Close() error {
 	return nil
 }
 
+// FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
 func FormatRFC3339(t time.Time) string {
 	return t.UTC().Format(time.RFC3339Nano)
 }

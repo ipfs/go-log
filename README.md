@@ -5,8 +5,10 @@
 [![](https://img.shields.io/badge/freenode-%23ipfs-blue.svg?style=flat-square)](http://webchat.freenode.net/?channels=%23ipfs)
 [![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![GoDoc](https://godoc.org/github.com/ipfs/go-log?status.svg)](https://godoc.org/github.com/ipfs/go-log)
-[![Coverage Status](https://coveralls.io/repos/github/ipfs/go-log/badge.svg?branch=master)](https://coveralls.io/github/ipfs/go-log?branch=master)
 [![Build Status](https://travis-ci.org/ipfs/go-log.svg?branch=master)](https://travis-ci.org/ipfs/go-log)
+
+<!---[![Coverage Status](https://coveralls.io/repos/github/ipfs/go-log/badge.svg?branch=master)](https://coveralls.io/github/ipfs/go-log?branch=master)--->
+
 
 > The logging library used by go-ipfs
 
@@ -22,9 +24,10 @@ go get github.com/ipfs/go-log
 
 Once the pacakge is imported under the name `logging`, an instance of `EventLogger` can be created like so:
 
-````go
+```go
 var log = logging.Logger("subsystem name")
 ```
+
 It can then be used to emit log messages, either plain printf-style messages at six standard levels or structured messages using `Event` and `EventBegin` methods.
 
 ## Contribute

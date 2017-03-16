@@ -47,19 +47,20 @@ func DeepMerge(b, a Metadata) Metadata {
 	return out
 }
 
-// Loggable implements the Loggable interface
+// Loggable implements the Loggable interface.
 func (m Metadata) Loggable() map[string]interface{} {
 	// NB: method defined on value to avoid de-referencing nil Metadata
 	return m
 }
 
+// JsonString returns the marshaled JSON string for the metadata.
 func (m Metadata) JsonString() (string, error) {
 	// NB: method defined on value
 	b, err := json.Marshal(m)
 	return string(b), err
 }
 
-// Metadatify converts maps into Metadata
+// Metadatify converts maps into Metadata.
 func Metadatify(i interface{}) (Metadata, error) {
 	value := reflect.ValueOf(i)
 	if value.Kind() == reflect.Map {

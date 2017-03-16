@@ -6,9 +6,10 @@ import (
 	logging "github.com/whyrusleeping/go-logging"
 )
 
-// Global writer group for logs to output to
+// WriterGroup is the global writer group for logs to output to
 var WriterGroup = NewMirrorWriter()
 
+// Option is a generic function
 type Option func()
 
 // Configure applies the provided options sequentially from left to right
@@ -28,6 +29,8 @@ var TextFormatter = func() {
 	logging.SetFormatter(logging.DefaultFormatter)
 }
 
+// Output returns an option which sets the the given writer as the new
+// logging backend
 func Output(w io.Writer) Option {
 	return func() {
 		backend := logging.NewLogBackend(w, "", 0)

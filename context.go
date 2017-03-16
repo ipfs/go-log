@@ -25,6 +25,7 @@ func ContextWithLoggable(ctx context.Context, l Loggable) context.Context {
 	return child
 }
 
+// MetadataFromContext extracts Matadata from a given context's value.
 func MetadataFromContext(ctx context.Context) (Metadata, error) {
 	value := ctx.Value(metadataKey)
 	if value != nil {
