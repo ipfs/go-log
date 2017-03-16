@@ -6,10 +6,14 @@ import (
 	"sync"
 )
 
+// MaxWriterBuffer specifies how big the writer buffer can get before
+// killing the writer.
 var MaxWriterBuffer = 512 * 1024
 
 var log = Logger("eventlog")
 
+// MirrorWriter implements a WriteCloser which syncs incoming bytes to multiple
+// [buffered] WriteClosers. They can be added with AddWriter().
 type MirrorWriter struct {
 	active   bool
 	activelk sync.Mutex
@@ -29,6 +33,7 @@ type writerSync struct {
 	br chan []byte
 }
 
+// NewMirrorWriter initializes and returns a MirrorWriter.
 func NewMirrorWriter() *MirrorWriter {
 	mw := &MirrorWriter{
 		msgSync:   make(chan []byte, 64), // sufficiently large buffer to avoid callers waiting
@@ -40,6 +45,7 @@ func NewMirrorWriter() *MirrorWriter {
 	return mw
 }
 
+// Write broadcasts the written bytes to all Writers.
 func (mw *MirrorWriter) Write(b []byte) (int, error) {
 	mycopy := make([]byte, len(b))
 	copy(mycopy, b)
@@ -47,6 +53,7 @@ func (mw *MirrorWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+// Close closes the MirrorWriter
 func (mw *MirrorWriter) Close() error {
 	// it is up to the caller to ensure that write is not called during or
 	// after close is called.
@@ -126,6 +133,8 @@ type writerAdd struct {
 	done chan struct{}
 }
 
+// AddWriter attaches a new WriteCloser to this MirrorWriter.
+// The new writer will start getting any bytes written to the mirror.
 func (mw *MirrorWriter) AddWriter(w io.WriteCloser) {
 	wa := &writerAdd{
 		w:    w,
@@ -135,6 +144,8 @@ func (mw *MirrorWriter) AddWriter(w io.WriteCloser) {
 	<-wa.done
 }
 
+// Active returns if there is at least one Writer
+// attached to this MirrorWriter
 func (mw *MirrorWriter) Active() (active bool) {
 	mw.activelk.Lock()
 	active = mw.active
@@ -152,6 +163,8 @@ func newBufWriter(w io.WriteCloser) *bufWriter {
 	return bw
 }
 
+// writes incoming messages to a buffer and when it fills
+// up, writes them to the writer
 type bufWriter struct {
 	writer io.WriteCloser
 
