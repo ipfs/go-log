@@ -8,6 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	opentrace "github.com/opentracing/opentracing-go"
+	otExt "github.com/opentracing/opentracing-go/ext"
+	otl "github.com/opentracing/opentracing-go/log"
 )
 
 // StandardLogger provides API compatibility with standard printf loggers
@@ -48,6 +52,8 @@ type EventLogger interface {
 	Event(ctx context.Context, event string, m ...Loggable)
 
 	EventBegin(ctx context.Context, event string, m ...Loggable) *EventInProgress
+
+	EventBeginInContext(ctx context.Context, event string, m ...Loggable) context.Context
 }
 
 // Logger retrieves an event logger by name
@@ -78,17 +84,50 @@ func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ..
 	start := time.Now()
 	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
 
+	span, ctx := opentrace.StartSpanFromContext(ctx, event)
+
 	eip := &EventInProgress{}
 	eip.doneFunc = func(additional []Loggable) {
-
 		metadata = append(metadata, additional...)                      // anything added during the operation
 		metadata = append(metadata, LoggableMap(map[string]interface{}{ // finally, duration of event
 			"duration": time.Now().Sub(start),
 		}))
 
 		el.Event(ctx, event, metadata...)
+		if traceingDisabled() {
+			return
+		}
+		otExt.Component.Set(span, el.system)
+		for _, m := range metadata {
+			for l, v := range m.Loggable() {
+				if l == "error" {
+					otExt.Error.Set(span, true)
+				}
+				f := getOpentracingField(l, v)
+				span.LogFields(f)
+			}
+		}
+		span.Finish()
 	}
 	return eip
+}
+
+type activeEventKeyType struct{}
+
+var activeEventKey = activeEventKeyType{}
+
+// Stores an event in a context to be finished at a later point
+func (el *eventLogger) EventBeginInContext(ctx context.Context, event string, metadata ...Loggable) context.Context {
+	eip := el.EventBegin(ctx, event, metadata...)
+	return context.WithValue(ctx, activeEventKey, eip)
+}
+
+// Will complete an event if there is one in ctx
+func MaybeFinishEvent(ctx context.Context) {
+	val := ctx.Value(activeEventKey)
+	if eip, ok := val.(*EventInProgress); ok {
+		eip.Done()
+	}
 }
 
 func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Loggable) {
@@ -171,4 +210,41 @@ func (eip *EventInProgress) Close() error {
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
 func FormatRFC3339(t time.Time) string {
 	return t.UTC().Format(time.RFC3339Nano)
+}
+
+func getOpentracingField(l string, v interface{}) otl.Field {
+	var f otl.Field
+	switch v.(type) {
+	case bool:
+		f = otl.Bool(l, v.(bool))
+	case string:
+		f = otl.String(l, v.(string))
+	case float32:
+		f = otl.Float32(l, v.(float32))
+	case float64:
+		f = otl.Float64(l, v.(float64))
+	case int:
+		f = otl.Int(l, v.(int))
+	case int32:
+		f = otl.Int32(l, v.(int32))
+	case int64:
+		f = otl.Int64(l, v.(int64))
+	case uint32:
+		f = otl.Uint32(l, v.(uint32))
+	case uint64:
+		f = otl.Uint64(l, v.(uint64))
+	default:
+		f = otl.Object(l, v)
+	}
+	return f
+}
+
+func traceingDisabled() bool {
+	maybeTracer := opentrace.GlobalTracer()
+	switch maybeTracer.(type) {
+	case opentrace.NoopTracer:
+		return true
+	default:
+		return false
+	}
 }
