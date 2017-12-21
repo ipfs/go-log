@@ -12,7 +12,7 @@
     },
     {
       "author": "forrestweston",
-      "hash": "QmYdApJEk7WcDz8mhbYrosKKbHxcP5thozoVe6fxaLwoXg",
+      "hash": "QmNzrrMTk2FKTAE66aVkbskzprpojeQaNJGid9xYVU3xAs",
       "name": "opentracing-go",
       "version": "0.0.0"
     }
@@ -22,6 +22,6 @@
   "language": "go",
   "license": "",
   "name": "go-log",
-  "version": "1.3.1"
+  "version": "1.3.2"
 }
 
