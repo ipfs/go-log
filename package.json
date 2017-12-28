@@ -12,9 +12,9 @@
     },
     {
       "author": "forrestweston",
-      "hash": "QmTK5zDUX4diGfA8ksDEdTcfwYZqGjLKBpFM8Ei1Niferw",
+      "hash": "QmXM3wtxSX3LsG41UXantdt6X88jMaRL5CouKnxCNiEHpM",
       "name": "opentracing-go",
-      "version": "0.0.1"
+      "version": "0.0.2"
     }
   ],
   "gxVersion": "0.7.0",
