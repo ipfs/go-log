@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"time"
 
-	opentrace "github.com/frrist/opentracing-go"
-	otExt "github.com/frrist/opentracing-go/ext"
-	otl "github.com/frrist/opentracing-go/log"
+	opentrace "github.com/opentracing/opentracing-go"
+	otExt "github.com/opentracing/opentracing-go/ext"
+	otl "github.com/opentracing/opentracing-go/log"
 )
 
 // StandardLogger provides API compatibility with standard printf loggers
