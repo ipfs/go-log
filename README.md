@@ -28,8 +28,59 @@ Once the pacakge is imported under the name `logging`, an instance of `EventLogg
 var log = logging.Logger("subsystem name")
 ```
 
-It can then be used to emit log messages, either plain printf-style messages at six standard levels or structured messages using `Event` and `EventBegin` methods.
+It can then be used to emit log messages, either plain printf-style messages at six standard levels or structured messages using `Event`, `EventBegin` and `EventBeginInContext` methods.
 
+## Examples
+
+**Event**
+```go
+log.Event(ctx, "event name", logging.LoggableMap{"metaKey": metaValue})
+```
+
+**EventBegin**
+
+In a method with named returns
+```go
+func (s *Session) GetBlock(ctx context.Context, c *cid.Cid) (blk blocks.Block, err error) {
+  eip := log.EventBegin(ctx, "Session.GetBlock", c)
+  defer func() {
+    if err != nil {
+      eip.SetError(err)
+    }
+    eip.Done()
+  }()
+  ...
+}
+```
+As a one liner
+```go
+defer log.EventBegin(ctx, "bootstrapDial", ph.ID(), p.ID).Done()
+```
+
+**EventBeginInContext**
+
+When an event spans more than one function call
+Start and event in the context
+```go
+func (s *blockService) GetBlocks(ctx context.Context, ks []*cid.Cid) <-chan blocks.Block {
+  ctx = log.EventBeginInContext(ctx, "BlockService.GetBlocks")
+  return getBlocks(ctx, ks, s.blockstore, s.exchange)
+}
+```
+Finish the event later
+```go
+func getBlocks(ctx context.Context, ks []*cid.Cid, bs blockstore.Blockstore, f exchange.Fetcher) <-chan blocks.Block {
+  ...
+  go func() {
+    defer logging.MaybeFinishEvent(ctx)
+    ...
+    select {
+    case out <- hit:
+    case <-ctx.Done():
+      return
+    }
+  }
+```
 ## Contribute
 
 Feel free to join in. All welcome. Open an [issue](https://github.com/ipfs/go-log/issues)!
