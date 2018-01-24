@@ -4,8 +4,10 @@
 package log
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +15,8 @@ import (
 	otExt "github.com/opentracing/opentracing-go/ext"
 	otl "github.com/opentracing/opentracing-go/log"
 )
+
+var ErrTracingDisabled = errors.New("tracing is disabled")
 
 // StandardLogger provides API compatibility with standard printf loggers
 // eg. go-logging
@@ -247,4 +251,49 @@ func traceingDisabled() bool {
 	default:
 		return false
 	}
+}
+
+func ExtractToContext(ctx context.Context, methodString string, tracerState []byte) (context.Context, opentrace.Span, error) {
+	if traceingDisabled() {
+		return nil, nil, ErrTracingDisabled
+	}
+	gTracer := opentrace.GlobalTracer()
+
+	b := new([]byte)
+	carrier := bytes.NewBuffer(*b)
+
+	sc, err := gTracer.Extract(opentrace.Binary, carrier)
+	if err != nil {
+		//TODO return an opentracing specific error
+		panic(err)
+	}
+	//the called must finishs this...annoying
+	span := gTracer.StartSpan(methodString, otExt.RPCServerOption(sc))
+
+	return opentrace.ContextWithSpan(ctx, span), span, nil
+}
+
+// InjectTraceState injects a SpanContext into a bytes buffer and returns it.
+// If the `GlobalTracer` is the `NoopTracer` an `ErrTracingDisabled` error is
+// returned
+func InjectTraceState(spanContext opentrace.SpanContext) ([]byte, error) {
+	if traceingDisabled() {
+		return nil, ErrTracingDisabled
+	}
+	sc, ok := spanContext.(opentrace.SpanContext)
+	if !ok {
+		//TODO return an opentracing specific error
+		panic(ok)
+	}
+
+	gTracer := opentrace.GlobalTracer()
+
+	b := new([]byte)
+	carrier := bytes.NewBuffer(*b)
+	if err := gTracer.Inject(sc, opentrace.Binary, carrier); err != nil {
+		//TODO return an opentracing specific error
+		panic(err)
+	}
+
+	return carrier.Bytes(), nil
 }
