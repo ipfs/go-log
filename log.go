@@ -201,6 +201,16 @@ func (eip *EventInProgress) Done() {
 	eip.doneFunc(eip.loggables) // create final event with extra data
 }
 
+// DoneWithErr creates a new Event entry that includes the duration and appended
+// loggables. DoneWithErr accepts an error, if err is non-nil, it is set on
+// the EventInProgress. Otherwise the logic is the same as the `Done()` method
+func (eip *EventInProgress) DoneWithErr(err error) {
+	if err != nil {
+		eip.SetError(err)
+	}
+	eip.doneFunc(eip.loggables)
+}
+
 // Close is an alias for done
 func (eip *EventInProgress) Close() error {
 	eip.Done()
