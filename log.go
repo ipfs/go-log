@@ -88,6 +88,9 @@ func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ..
 	start := time.Now()
 	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
 
+	if ctx == nil {
+		log.Error("Context is Nil in EventBeing")
+	}
 	span, ctx := opentrace.StartSpanFromContext(ctx, event)
 
 	eip := &EventInProgress{}
@@ -259,13 +262,13 @@ func ExtractToContext(ctx context.Context, methodString string, tracerState []by
 	}
 	gTracer := opentrace.GlobalTracer()
 
-	b := new([]byte)
-	carrier := bytes.NewBuffer(*b)
+	//b := make([]byte, 0)
+	carrier := bytes.NewBuffer(tracerState)
 
 	sc, err := gTracer.Extract(opentrace.Binary, carrier)
 	if err != nil {
-		//TODO return an opentracing specific error
-		panic(err)
+		log.Error("Failed to extract span context from carrier")
+		return nil, nil, opentrace.ErrInvalidCarrier
 	}
 	//the called must finishs this...annoying
 	span := gTracer.StartSpan(methodString, otExt.RPCServerOption(sc))
@@ -282,17 +285,17 @@ func InjectToBytes(spanContext opentrace.SpanContext) ([]byte, error) {
 	}
 	sc, ok := spanContext.(opentrace.SpanContext)
 	if !ok {
-		//TODO return an opentracing specific error
-		panic(ok)
+		log.Error("Failed to cast span context")
+		return nil, opentrace.ErrInvalidSpanContext
 	}
 
 	gTracer := opentrace.GlobalTracer()
 
-	b := new([]byte)
-	carrier := bytes.NewBuffer(*b)
+	b := make([]byte, 0)
+	carrier := bytes.NewBuffer(b)
 	if err := gTracer.Inject(sc, opentrace.Binary, carrier); err != nil {
-		//TODO return an opentracing specific error
-		panic(err)
+		log.Error("Failed to inject span context to carrier")
+		return nil, opentrace.ErrInvalidCarrier
 	}
 
 	return carrier.Bytes(), nil
