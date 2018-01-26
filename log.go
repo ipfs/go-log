@@ -276,7 +276,7 @@ func ExtractToContext(ctx context.Context, methodString string, tracerState []by
 // InjectTraceState injects a SpanContext into a bytes buffer and returns it.
 // If the `GlobalTracer` is the `NoopTracer` an `ErrTracingDisabled` error is
 // returned
-func InjectTraceState(spanContext opentrace.SpanContext) ([]byte, error) {
+func InjectToBytes(spanContext opentrace.SpanContext) ([]byte, error) {
 	if traceingDisabled() {
 		return nil, ErrTracingDisabled
 	}
