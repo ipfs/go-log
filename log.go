@@ -80,63 +80,13 @@ type eventLogger struct {
 	// TODO add log-level
 }
 
-func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ...Loggable) *EventInProgress {
-	_, eip := el.eventBeginHelper(ctx, event, metadata...)
-	return eip
-}
-
 type activeEventKeyType struct{}
 
 var activeEventKey = activeEventKeyType{}
 
-// Stores an event in a context to be finished at a later point
-func (el *eventLogger) EventBeginInContext(ctx context.Context, event string, metadata ...Loggable) context.Context {
-	ctx, eip := el.eventBeginHelper(ctx, event, metadata...)
-	return context.WithValue(ctx, activeEventKey, eip)
-}
-
-func (el *eventLogger) eventBeginHelper(ctx context.Context, event string, metadata ...Loggable) (context.Context, *EventInProgress) {
-	start := time.Now()
-	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
-
-	span, ctx := opentrace.StartSpanFromContext(ctx, event)
-
-	eip := &EventInProgress{}
-	eip.doneFunc = func(additional []Loggable) {
-		metadata = append(metadata, additional...)                      // anything added during the operation
-		metadata = append(metadata, LoggableMap(map[string]interface{}{ // finally, duration of event
-			"duration": time.Now().Sub(start),
-		}))
-
-		el.Event(ctx, event, metadata...)
-		if traceingDisabled() {
-			return
-		}
-		otExt.Component.Set(span, el.system)
-		for _, m := range metadata {
-			for l, v := range m.Loggable() {
-				if l == "error" {
-					otExt.Error.Set(span, true)
-				}
-				f := getOpentracingField(l, v)
-				span.LogFields(f)
-			}
-		}
-		span.Finish()
-	}
-	return ctx, eip
-}
-
-// Will complete an event if there is one in ctx
-func MaybeFinishEvent(ctx context.Context) {
-	val := ctx.Value(activeEventKey)
-	if eip, ok := val.(*EventInProgress); ok {
-		eip.Done()
-	}
-}
-
+// Event writes an event and any existing metadate held by the context
+// associated with it
 func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Loggable) {
-
 	// short circuit if theres nothing to write to
 	if !WriterGroup.Active() {
 		return
@@ -180,6 +130,93 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 	}
 
 	WriterGroup.Write(append(out, '\n'))
+}
+
+// EventBegin starts an EventInProgress and returns it. The eip is to be
+// completed at a later time
+// Example usage:
+//
+// func SomeFunction() (err error) {
+//    eip := log.EventBegin(ctx, "DoesSomething")
+//    defer func() {
+//        eip.DoneWithErr(err)
+//    }()
+//    ...
+//  }
+func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ...Loggable) *EventInProgress {
+	_, eip := el.eventBeginHelper(ctx, event, metadata...)
+	return eip
+}
+
+// EventBeginInContext starts an EventInProgress, stores it in the context, and
+// returns the new context. The eip can be completed at a later time using the
+// `MaybeFinishEvent()` method
+// Example usage:
+//
+// func SomeFunction(ctx) {
+//    ctx := log.EventBeginInContext(ctx, "DoesSomething")
+//    ...
+//    go func() {
+//        defer logging.MaybeFinishEvent(ctx)
+//        ...
+//    }
+//    ...
+//  }
+func (el *eventLogger) EventBeginInContext(ctx context.Context, event string, metadata ...Loggable) context.Context {
+	ctx, eip := el.eventBeginHelper(ctx, event, metadata...)
+	return context.WithValue(ctx, activeEventKey, eip)
+}
+
+// MaybeFinishedEvent completes an event associated with ctx.
+// Example usage:
+//
+// func SomeFunction(ctx) {
+//    ctx := log.EventBeginInContext(ctx, "DoesSomething")
+//    ...
+//    go func() {
+//        defer logging.MaybeFinishEvent(ctx)
+//        ...
+//    }
+//    ...
+//  }
+func MaybeFinishEvent(ctx context.Context) {
+	val := ctx.Value(activeEventKey)
+	if eip, ok := val.(*EventInProgress); ok {
+		eip.Done()
+	}
+}
+
+// A helper function for creating events
+func (el *eventLogger) eventBeginHelper(ctx context.Context, event string, metadata ...Loggable) (context.Context, *EventInProgress) {
+	start := time.Now()
+	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
+
+	span, ctx := opentrace.StartSpanFromContext(ctx, event)
+
+	eip := &EventInProgress{}
+	eip.doneFunc = func(additional []Loggable) {
+		metadata = append(metadata, additional...)                      // anything added during the operation
+		metadata = append(metadata, LoggableMap(map[string]interface{}{ // finally, duration of event
+			"duration": time.Now().Sub(start),
+		}))
+
+		el.Event(ctx, event, metadata...)
+		if traceingDisabled() {
+			return
+		}
+		otExt.Component.Set(span, el.system)
+		for _, m := range metadata {
+			for l, v := range m.Loggable() {
+				if l == "error" {
+					otExt.Error.Set(span, true)
+				}
+				f := getOpentracingField(l, v)
+				span.LogFields(f)
+			}
+		}
+		span.Finish()
+	}
+	return ctx, eip
 }
 
 // EventInProgress represent and event which is happening
