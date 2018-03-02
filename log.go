@@ -4,6 +4,7 @@
 package log
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -83,6 +84,7 @@ type eventLogger struct {
 type activeEventKeyType struct{}
 
 var activeEventKey = activeEventKeyType{}
+var TracerStateKey = "TRACER_STATE_KEY"
 
 // Event writes an event and any existing metadate held by the context
 // associated with it
@@ -191,9 +193,35 @@ func (el *eventLogger) eventBeginHelper(ctx context.Context, event string, metad
 	start := time.Now()
 	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
 
-	span, ctx := opentrace.StartSpanFromContext(ctx, event)
+	//This is really hacky..and slow....and just bad
+	//see if we were given metadata with a passed tracer state
+	var maybeState []byte
+	for _, m := range metadata {
+		for l, v := range m.Loggable() {
+			if l == TracerStateKey {
+				maybeState = v.([]byte)
+			}
+		}
+	}
+	// if a tracerState was passed try and extract it
+	var span opentrace.Span
+	if len(maybeState) > 0 {
+		gTracer := opentrace.GlobalTracer()
+		carrier := bytes.NewBuffer(maybeState)
+		spanContext, err := gTracer.Extract(opentrace.Binary, carrier)
+		if err != nil {
+			log.Error("Failed to extract span context from carrier")
+			//so create a span without the passed state..this probably won't ever happen
+			span, ctx = opentrace.StartSpanFromContext(ctx, event)
+		} else {
+			span, ctx = opentrace.StartSpanFromContext(ctx, event, otExt.RPCServerOption(spanContext))
+		}
+	} else {
+		span, ctx = opentrace.StartSpanFromContext(ctx, event)
+	}
 
 	eip := &EventInProgress{}
+	eip.spanCtx = span.Context()
 	eip.doneFunc = func(additional []Loggable) {
 		metadata = append(metadata, additional...)                      // anything added during the operation
 		metadata = append(metadata, LoggableMap(map[string]interface{}{ // finally, duration of event
@@ -223,6 +251,7 @@ func (el *eventLogger) eventBeginHelper(ctx context.Context, event string, metad
 type EventInProgress struct {
 	loggables []Loggable
 	doneFunc  func([]Loggable)
+	spanCtx   opentrace.SpanContext
 }
 
 // Append adds loggables to be included in the call to Done
@@ -257,6 +286,19 @@ func (eip *EventInProgress) DoneWithErr(err error) {
 func (eip *EventInProgress) Close() error {
 	eip.Done()
 	return nil
+}
+
+func (eip *EventInProgress) SeralizeSpanContxt() ([]byte, error) {
+	gTracer := opentrace.GlobalTracer()
+
+	b := make([]byte, 0)
+	carrier := bytes.NewBuffer(b)
+	if err := gTracer.Inject(eip.spanCtx, opentrace.Binary, carrier); err != nil {
+		log.Error("Failed to inject span context to carrier")
+		return nil, opentrace.ErrInvalidCarrier
+	}
+
+	return carrier.Bytes(), nil
 }
 
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
