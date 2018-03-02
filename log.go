@@ -81,6 +81,21 @@ type eventLogger struct {
 }
 
 func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ...Loggable) *EventInProgress {
+	_, eip := el.eventBeginHelper(ctx, event, metadata...)
+	return eip
+}
+
+type activeEventKeyType struct{}
+
+var activeEventKey = activeEventKeyType{}
+
+// Stores an event in a context to be finished at a later point
+func (el *eventLogger) EventBeginInContext(ctx context.Context, event string, metadata ...Loggable) context.Context {
+	ctx, eip := el.eventBeginHelper(ctx, event, metadata...)
+	return context.WithValue(ctx, activeEventKey, eip)
+}
+
+func (el *eventLogger) eventBeginHelper(ctx context.Context, event string, metadata ...Loggable) (context.Context, *EventInProgress) {
 	start := time.Now()
 	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
 
@@ -109,17 +124,7 @@ func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ..
 		}
 		span.Finish()
 	}
-	return eip
-}
-
-type activeEventKeyType struct{}
-
-var activeEventKey = activeEventKeyType{}
-
-// Stores an event in a context to be finished at a later point
-func (el *eventLogger) EventBeginInContext(ctx context.Context, event string, metadata ...Loggable) context.Context {
-	eip := el.EventBegin(ctx, event, metadata...)
-	return context.WithValue(ctx, activeEventKey, eip)
+	return ctx, eip
 }
 
 // Will complete an event if there is one in ctx
