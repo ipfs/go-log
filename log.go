@@ -191,7 +191,10 @@ func (el *eventLogger) eventBeginHelper(ctx context.Context, event string, metad
 	start := time.Now()
 	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
 
-	span, ctx := opentrace.StartSpanFromContext(ctx, event)
+	var span opentrace.Span
+	if !traceingDisabled() {
+		span, ctx = opentrace.StartSpanFromContext(ctx, event)
+	}
 
 	eip := &EventInProgress{}
 	eip.doneFunc = func(additional []Loggable) {
