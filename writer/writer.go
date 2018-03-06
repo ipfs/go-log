@@ -10,8 +10,6 @@ import (
 // killing the writer.
 var MaxWriterBuffer = 512 * 1024
 
-var log = Logger("eventlog")
-
 // MirrorWriter implements a WriteCloser which syncs incoming bytes to multiple
 // [buffered] WriteClosers. They can be added with AddWriter().
 type MirrorWriter struct {
@@ -211,7 +209,8 @@ func (bw *bufWriter) loop() {
 		for b := range nextCh {
 			_, err := bw.writer.Write(b)
 			if err != nil {
-				log.Info("eventlog write error: %s", err)
+				// TODO: need a way to notify there was an error here
+				// wouldn't want to log here as it could casue an infinite loop
 				bw.die()
 				return
 			}

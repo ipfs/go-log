@@ -48,7 +48,7 @@ func (m *TracerState) GetBaggageItems() map[string]string {
 }
 
 func init() {
-	proto.RegisterType((*TracerState)(nil), "basictracer_go.wire.TracerState")
+	proto.RegisterType((*TracerState)(nil), "loggabletracer_go.wire.TracerState")
 }
 func (m *TracerState) Marshal() (data []byte, err error) {
 	size := m.Size()

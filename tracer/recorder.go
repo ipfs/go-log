@@ -1,6 +1,13 @@
-package basictracer
+package loggabletracer
 
-import "sync"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	writer "github.com/ipfs/go-log/writer"
+	opentrace "github.com/opentracing/opentracing-go"
+)
 
 // A SpanRecorder handles all of the `RawSpan` data generated via an
 // associated `Tracer` (see `NewStandardTracer`) instance. It also names
@@ -10,51 +17,62 @@ type SpanRecorder interface {
 	RecordSpan(span RawSpan)
 }
 
-// InMemorySpanRecorder is a simple thread-safe implementation of
-// SpanRecorder that stores all reported spans in memory, accessible
-// via reporter.GetSpans(). It is primarily intended for testing purposes.
-type InMemorySpanRecorder struct {
-	sync.RWMutex
-	spans []RawSpan
+type LoggableSpanRecorder struct{}
+
+// NewLoggableRecorder creates new LoggableSpanRecorder
+func NewLoggableRecorder() *LoggableSpanRecorder {
+	return new(LoggableSpanRecorder)
 }
 
-// NewInMemoryRecorder creates new InMemorySpanRecorder
-func NewInMemoryRecorder() *InMemorySpanRecorder {
-	return new(InMemorySpanRecorder)
+// Loggable Representation of a span, treated as an event log
+type LoggableSpan struct {
+	Operation string         `json:"Operation"`
+	Start     time.Time      `json:"Start"`
+	Duration  time.Duration  `json:"Duration"`
+	Tags      opentrace.Tags `json:"Tags"`
+	Logs      []SpanLog      `json:"Logs"`
+}
+
+type SpanLog struct {
+	Timestamp time.Time   `json:"Timestamp"`
+	Field     []SpanField `json:"Fields"`
+}
+
+type SpanField struct {
+	Key   string `json:"Key"`
+	Value string `json:"Value"`
 }
 
 // RecordSpan implements the respective method of SpanRecorder.
-func (r *InMemorySpanRecorder) RecordSpan(span RawSpan) {
-	r.Lock()
-	defer r.Unlock()
-	r.spans = append(r.spans, span)
-}
+func (r *LoggableSpanRecorder) RecordSpan(span RawSpan) {
+	// short circuit if theres nothing to write to
+	if !writer.WriterGroup.Active() {
+		return
+	}
 
-// GetSpans returns a copy of the array of spans accumulated so far.
-func (r *InMemorySpanRecorder) GetSpans() []RawSpan {
-	r.RLock()
-	defer r.RUnlock()
-	spans := make([]RawSpan, len(r.spans))
-	copy(spans, r.spans)
-	return spans
-}
-
-// GetSampledSpans returns a slice of spans accumulated so far which were sampled.
-func (r *InMemorySpanRecorder) GetSampledSpans() []RawSpan {
-	r.RLock()
-	defer r.RUnlock()
-	spans := make([]RawSpan, 0, len(r.spans))
-	for _, span := range r.spans {
-		if span.Context.Sampled {
-			spans = append(spans, span)
+	sl := make([]SpanLog, len(span.Logs))
+	for i := range span.Logs {
+		sl[i].Timestamp = span.Logs[i].Timestamp
+		sf := make([]SpanField, len(span.Logs[i].Fields))
+		sl[i].Field = sf
+		for j := range span.Logs[i].Fields {
+			sf[j].Key = span.Logs[i].Fields[j].Key()
+			sf[j].Value = fmt.Sprint(span.Logs[i].Fields[j].Value())
 		}
 	}
-	return spans
-}
 
-// Reset clears the internal array of spans.
-func (r *InMemorySpanRecorder) Reset() {
-	r.Lock()
-	defer r.Unlock()
-	r.spans = nil
+	spanlog := &LoggableSpan{
+		Operation: span.Operation,
+		Start:     span.Start,
+		Duration:  span.Duration,
+		Tags:      span.Tags,
+		Logs:      sl,
+	}
+
+	out, err := json.Marshal(spanlog)
+	if err != nil {
+		fmt.Errorf("ERROR FORMATTING SPAN ENTRY: %s", err)
+	}
+
+	writer.WriterGroup.Write(append(out, '\n'))
 }

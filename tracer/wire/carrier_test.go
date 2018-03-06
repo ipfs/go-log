@@ -3,12 +3,12 @@ package wire_test
 import (
 	"testing"
 
-	"github.com/opentracing/basictracer-go"
-	"github.com/opentracing/basictracer-go/wire"
+	tracer "github.com/ipfs/go-log/tracer"
+	"github.com/ipfs/go-log/tracer/wire"
 )
 
 func TestProtobufCarrier(t *testing.T) {
-	var carrier basictracer.DelegatingCarrier = &wire.ProtobufCarrier{}
+	var carrier tracer.DelegatingCarrier = &wire.ProtobufCarrier{}
 
 	var traceID, spanID uint64 = 1, 2
 	sampled := true

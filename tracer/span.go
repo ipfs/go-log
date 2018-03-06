@@ -1,4 +1,4 @@
-package basictracer
+package loggabletracer
 
 import (
 	"sync"
@@ -10,7 +10,7 @@ import (
 )
 
 // Span provides access to the essential details of the span, for use
-// by basictracer consumers.  These methods may only be called prior
+// by loggabletracer consumers.  These methods may only be called prior
 // to (*opentracing.Span).Finish().
 type Span interface {
 	opentracing.Span
@@ -23,7 +23,7 @@ type Span interface {
 }
 
 // Implements the `Span` interface. Created via tracerImpl (see
-// `basictracer.New()`).
+// `loggabletracer.New()`).
 type spanImpl struct {
 	tracer     *tracerImpl
 	event      func(SpanEvent)
@@ -214,7 +214,7 @@ func (s *spanImpl) FinishWithOptions(opts opentracing.FinishOptions) {
 			Fields: []log.Field{
 				log.String("event", "dropped Span logs"),
 				log.Int("dropped_log_count", numDropped),
-				log.String("component", "basictracer"),
+				log.String("component", "loggabletracer"),
 			},
 		}
 	}

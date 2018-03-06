@@ -1,4 +1,4 @@
-package basictracer
+package loggabletracer
 
 import (
 	"time"
@@ -7,7 +7,7 @@ import (
 )
 
 // Tracer extends the opentracing.Tracer interface with methods to
-// probe implementation state, for use by basictracer consumers.
+// probe implementation state, for use by loggabletracer consumers.
 type Tracer interface {
 	opentracing.Tracer
 
@@ -105,8 +105,6 @@ func DefaultOptions() Options {
 // NewWithOptions creates a customized Tracer.
 func NewWithOptions(opts Options) opentracing.Tracer {
 	rval := &tracerImpl{options: opts}
-	rval.textPropagator = &textMapPropagator{rval}
-	rval.binaryPropagator = &binaryPropagator{rval}
 	rval.accessorPropagator = &accessorPropagator{rval}
 	return rval
 }
@@ -124,8 +122,6 @@ func New(recorder SpanRecorder) opentracing.Tracer {
 // Implements the `Tracer` interface.
 type tracerImpl struct {
 	options            Options
-	textPropagator     *textMapPropagator
-	binaryPropagator   *binaryPropagator
 	accessorPropagator *accessorPropagator
 }
 
@@ -167,7 +163,7 @@ func (t *tracerImpl) StartSpanWithOptions(
 	sp := t.getSpan()
 	// Look for a parent in the list of References.
 	//
-	// TODO: would be nice if basictracer did something with all
+	// TODO: would be nice if loggabletracer did something with all
 	// References, not just the first one.
 ReferencesLoop:
 	for _, ref := range opts.References {
@@ -231,32 +227,21 @@ type delegatorType struct{}
 // Delegator is the format to use for DelegatingCarrier.
 var Delegator delegatorType
 
+// Required by interface, not used by go-log
 func (t *tracerImpl) Inject(sc opentracing.SpanContext, format interface{}, carrier interface{}) error {
-	switch format {
-	case opentracing.TextMap, opentracing.HTTPHeaders:
-		return t.textPropagator.Inject(sc, carrier)
-	case opentracing.Binary:
-		return t.binaryPropagator.Inject(sc, carrier)
-	}
 	if _, ok := format.(delegatorType); ok {
 		return t.accessorPropagator.Inject(sc, carrier)
 	}
 	return opentracing.ErrUnsupportedFormat
 }
 
+// Required by interface, not used by go-log
 func (t *tracerImpl) Extract(format interface{}, carrier interface{}) (opentracing.SpanContext, error) {
-	switch format {
-	case opentracing.TextMap, opentracing.HTTPHeaders:
-		return t.textPropagator.Extract(carrier)
-	case opentracing.Binary:
-		return t.binaryPropagator.Extract(carrier)
-	}
 	if _, ok := format.(delegatorType); ok {
 		return t.accessorPropagator.Extract(carrier)
 	}
 	return nil, opentracing.ErrUnsupportedFormat
 }
-
 func (t *tracerImpl) Options() Options {
 	return t.options
 }

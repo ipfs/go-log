@@ -1,4 +1,4 @@
-package basictracer
+package loggabletracer
 
 import (
 	"encoding/binary"
@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/opentracing/basictracer-go/wire"
+	"github.com/ipfs/go-log/tracer/wire"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 

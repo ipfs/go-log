@@ -1,4 +1,4 @@
-package basictracer
+package loggabletracer
 
 import (
 	"sync/atomic"
