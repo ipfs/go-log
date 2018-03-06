@@ -35,11 +35,15 @@ type Sample struct {
 }
 
 func (sl *sampleLogger) Start(ctx context.Context, name string) *Sample {
-	span, sampleCtx := opentrace.StartSpanFromContext(ctx, name)
+	sampleSpan, sampleCtx := opentrace.StartSpanFromContext(ctx, name)
 
-	sample := sampleCtx.(Sample)
-	sample.span = span
-	return &sample
+	out := &Sample{
+		Context: sampleCtx,
+		span:    sampleSpan,
+	}
+	out.span.SetTag("FORREST", "FORREST")
+	return out
+
 }
 
 func (sl *sampleLogger) StartFromParentState(ctx context.Context, name string, parent []byte) *Sample {
