@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	colorable "github.com/mattn/go-colorable"
 	logging "github.com/whyrusleeping/go-logging"
 )
 
@@ -44,7 +45,7 @@ func SetupLogging() {
 		lfmt = LogFormats[defaultLogFormat]
 	}
 
-	backend := logging.NewLogBackend(os.Stderr, "", 0)
+	backend := logging.NewLogBackend(colorable.NewColorableStderr(), "", 0)
 	logging.SetBackend(backend)
 	logging.SetFormatter(logging.MustStringFormatter(lfmt))
 

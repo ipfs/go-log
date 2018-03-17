@@ -15,6 +15,12 @@
       "hash": "QmWLWmRVSiagqP15jczsGME1qpob6HDbtbHAY2he9W5iUo",
       "name": "opentracing-go",
       "version": "0.0.3"
+    },
+    {
+      "author": "mattn",
+      "hash": "QmVrtgFpU2Q7FmuqHuiB62BZJrAtatBAxwFSmwYQpzA1eA",
+      "name": "go-colorable",
+      "version": "0.1.0"
     }
   ],
   "gxVersion": "0.7.0",
