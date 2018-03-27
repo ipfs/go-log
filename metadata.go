@@ -21,6 +21,9 @@ func DeepMerge(b, a Metadata) Metadata {
 		maybe, err := Metadatify(v)
 		if err != nil {
 			// if the new value is not meta. just overwrite the dest vaue
+			if out[k] != nil {
+				log.Errorf("Over writting key: %s, old: %s, new: %s", k, out[k], v)
+			}
 			out[k] = v
 			continue
 		}
