@@ -200,8 +200,8 @@ func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
 	span.SetTag(k, v)
 }
 
-// SetErr tags the span associated with `ctx` to reflect an error occuring, and
-// logs key `k` and value `v` on the associated span
+// SetErr tags the span associated with `ctx` to reflect an error occured, and
+// logs the value `err` under key `error`
 func (el *eventLogger) SetErr(ctx context.Context, err error) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
