@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"path"
 	"runtime"
 	"time"
@@ -170,10 +169,11 @@ func (el *eventLogger) StartFromParentState(ctx context.Context, operationName s
 // it to bytes.
 func (el *eventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
 	gTracer := opentrace.GlobalTracer()
-	var carrier bytes.Buffer
+	b := make([]byte, 0)
+	carrier := bytes.NewBuffer(b)
 	span := opentrace.SpanFromContext(ctx)
 	if err := gTracer.Inject(span.Context(), opentrace.Binary, carrier); err != nil {
-		return nil, errors.New("Failed to serialize context")
+		return nil, err
 	}
 	return carrier.Bytes(), nil
 }

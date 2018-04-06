@@ -122,6 +122,8 @@ func New(recorder SpanRecorder) opentracing.Tracer {
 // Implements the `Tracer` interface.
 type tracerImpl struct {
 	options            Options
+	textPropagator     *textMapPropagator
+	binaryPropagator   *binaryPropagator
 	accessorPropagator *accessorPropagator
 }
 
@@ -227,21 +229,32 @@ type delegatorType struct{}
 // Delegator is the format to use for DelegatingCarrier.
 var Delegator delegatorType
 
-// Required by interface, not used by go-log
 func (t *tracerImpl) Inject(sc opentracing.SpanContext, format interface{}, carrier interface{}) error {
+	switch format {
+	case opentracing.TextMap, opentracing.HTTPHeaders:
+		return t.textPropagator.Inject(sc, carrier)
+	case opentracing.Binary:
+		return t.binaryPropagator.Inject(sc, carrier)
+	}
 	if _, ok := format.(delegatorType); ok {
 		return t.accessorPropagator.Inject(sc, carrier)
 	}
 	return opentracing.ErrUnsupportedFormat
 }
 
-// Required by interface, not used by go-log
 func (t *tracerImpl) Extract(format interface{}, carrier interface{}) (opentracing.SpanContext, error) {
+	switch format {
+	case opentracing.TextMap, opentracing.HTTPHeaders:
+		return t.textPropagator.Extract(carrier)
+	case opentracing.Binary:
+		return t.binaryPropagator.Extract(carrier)
+	}
 	if _, ok := format.(delegatorType); ok {
 		return t.accessorPropagator.Extract(carrier)
 	}
 	return nil, opentracing.ErrUnsupportedFormat
 }
+
 func (t *tracerImpl) Options() Options {
 	return t.options
 }
