@@ -190,14 +190,14 @@ func (el *eventLogger) LogKV(ctx context.Context, k string, v interface{}) {
 }
 
 // SetTag tags key `k` and value `v` on the span associated with `ctx`
-func (el *eventLogger) SetTag(ctx context.Context, key string, value interface{}) {
+func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
 		_, file, line, _ := runtime.Caller(1)
 		log.Errorf("SetTag with no Span in context called on %s:%d", path.Base(file), line)
 		return
 	}
-	span.SetTag(key, value)
+	span.SetTag(k, v)
 }
 
 // SetErr tags the span associated with `ctx` to reflect an error occuring, and
