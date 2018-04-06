@@ -282,8 +282,7 @@ func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ..
 	eip.doneFunc = func(additional []Loggable) {
 		// anything added during the operation
 		// e.g. deprecated methods event.Append(...) or event.SetError(...)
-		metadata = append(metadata, additional...)
-		for _, m := range metadata {
+		for _, m := range eip.loggables {
 			for l, v := range m.Loggable() {
 				el.LogKV(ctx, l, v)
 			}
