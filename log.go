@@ -285,10 +285,6 @@ func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ..
 		metadata = append(metadata, additional...)
 		for _, m := range metadata {
 			for l, v := range m.Loggable() {
-				// because errors are tags on spans
-				if l == "error" {
-					el.SetErr(ctx, v.(error))
-				}
 				el.LogKV(ctx, l, v)
 			}
 		}
