@@ -220,3 +220,85 @@ func getEvent(ed *json.Decoder) tracer.LoggableSpan {
 	ed.Decode(&ls)
 	return ls
 }
+
+// DEPRECATED methods tested below
+func TestEventBegin(t *testing.T) {
+	assert := assert.New(t)
+
+	// Set up a pipe to use as backend and log stream
+	lgs, lgb := io.Pipe()
+	// event logs will be written to lgb
+	// event logs will be read from lgs
+	writer.WriterGroup.AddWriter(lgb)
+	evtDecoder := json.NewDecoder(lgs)
+
+	// create a logger
+	lgr := Logger("test")
+
+	// create a root context
+	ctx := context.Background()
+
+	// start an event in progress with metadata
+	eip := lgr.EventBegin(ctx, "event", LoggableMap{"key": "val"})
+
+	// append more metadata
+	eip.Append(LoggableMap{"foo": "bar"})
+
+	// set an error
+	eip.SetError(errors.New("gerrr im an error"))
+
+	// finish the event
+	eip.Done()
+
+	// decode the log event
+	var ls tracer.LoggableSpan
+	evtDecoder.Decode(&ls)
+
+	assert.Equal("event", ls.Operation)
+	assert.Equal("test", ls.Tags["system"])
+	assert.Contains(ls.Logs[0].Field[0].Value, "val")
+	assert.Contains(ls.Logs[1].Field[0].Value, "bar")
+	assert.Contains(ls.Logs[2].Field[0].Value, "gerrr im an error")
+	// greater than zero should work for now
+	assert.NotZero(ls.Duration)
+	assert.NotZero(ls.Start)
+}
+
+func TestEventBeginWithErr(t *testing.T) {
+	assert := assert.New(t)
+
+	// Set up a pipe to use as backend and log stream
+	lgs, lgb := io.Pipe()
+	// event logs will be written to lgb
+	// event logs will be read from lgs
+	writer.WriterGroup.AddWriter(lgb)
+	evtDecoder := json.NewDecoder(lgs)
+
+	// create a logger
+	lgr := Logger("test")
+
+	// create a root context
+	ctx := context.Background()
+
+	// start an event in progress with metadata
+	eip := lgr.EventBegin(ctx, "event", LoggableMap{"key": "val"})
+
+	// append more metadata
+	eip.Append(LoggableMap{"foo": "bar"})
+
+	// finish the event with an error
+	eip.DoneWithErr(errors.New("gerrr im an error"))
+
+	// decode the log event
+	var ls tracer.LoggableSpan
+	evtDecoder.Decode(&ls)
+
+	assert.Equal("event", ls.Operation)
+	assert.Equal("test", ls.Tags["system"])
+	assert.Contains(ls.Logs[0].Field[0].Value, "val")
+	assert.Contains(ls.Logs[1].Field[0].Value, "bar")
+	assert.Contains(ls.Logs[2].Field[0].Value, "gerrr im an error")
+	// greater than zero should work for now
+	assert.NotZero(ls.Duration)
+	assert.NotZero(ls.Start)
+}
