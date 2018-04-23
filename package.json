@@ -15,12 +15,6 @@
       "hash": "QmWLWmRVSiagqP15jczsGME1qpob6HDbtbHAY2he9W5iUo",
       "name": "opentracing-go",
       "version": "0.0.3"
-    },
-    {
-      "author": "frrist",
-      "hash": "QmZRydu2Ri4CXDbWqfcXjyyUEdRig7xHfnzeWj1fwbTdEs",
-      "name": "testify",
-      "version": "0.0.0"
     }
   ],
   "gxVersion": "0.7.0",
