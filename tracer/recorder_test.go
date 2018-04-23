@@ -8,12 +8,15 @@ import (
 
 	writer "github.com/ipfs/go-log/writer"
 	opentrace "github.com/opentracing/opentracing-go"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestSpanRecorder(t *testing.T) {
-	assert := assert.New(t)
+func assertEqual(t *testing.T, expected interface{}, actual interface{}) {
+	if expected != actual {
+		t.Fatalf("%s != %s", expected, actual)
+	}
+}
 
+func TestSpanRecorder(t *testing.T) {
 	// Set up a writer to send spans to
 	pr, pw := io.Pipe()
 	writer.WriterGroup.AddWriter(pw)
@@ -43,9 +46,9 @@ func TestSpanRecorder(t *testing.T) {
 	evtDecoder.Decode(&ls)
 
 	// validate
-	assert.Equal(rs.Operation, ls.Operation)
-	assert.Equal(rs.Duration, ls.Duration)
-	assert.Equal(rs.Start.Nanosecond(), ls.Start.Nanosecond())
-	assert.Equal(rs.Tags, ls.Tags)
+	assertEqual(t, rs.Operation, ls.Operation)
+	assertEqual(t, rs.Duration, ls.Duration)
+	assertEqual(t, rs.Start.Nanosecond(), ls.Start.Nanosecond())
+	assertEqual(t, rs.Tags["key"], ls.Tags["key"])
 
 }

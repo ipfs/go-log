@@ -9,12 +9,21 @@ import (
 
 	tracer "github.com/ipfs/go-log/tracer"
 	writer "github.com/ipfs/go-log/writer"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestSingleEvent(t *testing.T) {
-	assert := assert.New(t)
+func assertEqual(t *testing.T, expected interface{}, actual interface{}) {
+	if expected != actual {
+		t.Fatalf("%s != %s", expected, actual)
+	}
+}
 
+func assertNotZero(t *testing.T, a interface{}) {
+	if a == 0 {
+		t.Fatalf("%s = 0", a)
+	}
+}
+
+func TestSingleEvent(t *testing.T) {
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
@@ -39,15 +48,14 @@ func TestSingleEvent(t *testing.T) {
 	evtDecoder.Decode(&ls)
 
 	// event name and system should be
-	assert.Equal("event1", ls.Operation)
-	assert.Equal("test", ls.Tags["system"])
+	assertEqual(t, "event1", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
 	// greater than zero should work for now
-	assert.NotZero(ls.Duration)
-	assert.NotZero(ls.Start)
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
 }
 
 func TestSingleEventWithErr(t *testing.T) {
-	assert := assert.New(t)
 
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
@@ -73,18 +81,16 @@ func TestSingleEventWithErr(t *testing.T) {
 	evtDecoder.Decode(&ls)
 
 	// event name and system should be
-	assert.Equal("event1", ls.Operation)
-	assert.Equal("test", ls.Tags["system"])
-	assert.Equal(true, ls.Tags["error"])
-	assert.Contains(ls.Logs[0].Field[0].Value, "rawer im an error")
+	assertEqual(t, "event1", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
+	assertEqual(t, true, ls.Tags["error"])
+	assertEqual(t, ls.Logs[0].Field[0].Value, "rawer im an error")
 	// greater than zero should work for now
-	assert.NotZero(ls.Duration)
-	assert.NotZero(ls.Start)
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
 }
 
 func TestEventWithTag(t *testing.T) {
-	assert := assert.New(t)
-
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
@@ -110,17 +116,15 @@ func TestEventWithTag(t *testing.T) {
 	evtDecoder.Decode(&ls)
 
 	// event name and system should be
-	assert.Equal("event1", ls.Operation)
-	assert.Equal("test", ls.Tags["system"])
-	assert.Equal("tv", ls.Tags["tk"])
+	assertEqual(t, "event1", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
+	assertEqual(t, "tv", ls.Tags["tk"])
 	// greater than zero should work for now
-	assert.NotZero(ls.Duration)
-	assert.NotZero(ls.Start)
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
 }
 
 func TestEventWithTags(t *testing.T) {
-	assert := assert.New(t)
-
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
@@ -149,18 +153,16 @@ func TestEventWithTags(t *testing.T) {
 	evtDecoder.Decode(&ls)
 
 	// event name and system should be
-	assert.Equal("event1", ls.Operation)
-	assert.Equal("test", ls.Tags["system"])
-	assert.Equal("tv1", ls.Tags["tk1"])
-	assert.Equal("tv2", ls.Tags["tk2"])
+	assertEqual(t, "event1", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
+	assertEqual(t, "tv1", ls.Tags["tk1"])
+	assertEqual(t, "tv2", ls.Tags["tk2"])
 	// greater than zero should work for now
-	assert.NotZero(ls.Duration)
-	assert.NotZero(ls.Start)
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
 }
 
 func TestEventWithLogs(t *testing.T) {
-	assert := assert.New(t)
-
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
@@ -187,26 +189,24 @@ func TestEventWithLogs(t *testing.T) {
 	evtDecoder.Decode(&ls)
 
 	// event name and system should be
-	assert.Equal("event1", ls.Operation)
-	assert.Equal("test", ls.Tags["system"])
+	assertEqual(t, "event1", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
 
-	assert.Equal("log1", ls.Logs[0].Field[0].Key)
-	assert.Equal("logv1", ls.Logs[0].Field[0].Value)
-	assert.Equal("log2", ls.Logs[0].Field[1].Key)
-	assert.Equal("logv2", ls.Logs[0].Field[1].Value)
+	assertEqual(t, "log1", ls.Logs[0].Field[0].Key)
+	assertEqual(t, "logv1", ls.Logs[0].Field[0].Value)
+	assertEqual(t, "log2", ls.Logs[0].Field[1].Key)
+	assertEqual(t, "logv2", ls.Logs[0].Field[1].Value)
 
 	// Should be a differnt log (different timestamp)
-	assert.Equal("treeLog", ls.Logs[1].Field[0].Key)
-	assert.Equal("[Pine Juniper Spruce Ginkgo]", ls.Logs[1].Field[0].Value)
+	assertEqual(t, "treeLog", ls.Logs[1].Field[0].Key)
+	assertEqual(t, "[Pine Juniper Spruce Ginkgo]", ls.Logs[1].Field[0].Value)
 
 	// greater than zero should work for now
-	assert.NotZero(ls.Duration)
-	assert.NotZero(ls.Start)
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
 }
 
 func TestMultiEvent(t *testing.T) {
-	assert := assert.New(t)
-
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
@@ -228,29 +228,25 @@ func TestMultiEvent(t *testing.T) {
 	lgr.Finish(ctx)
 
 	e1 := getEvent(evtDecoder)
-	assert.Equal("e1", e1.Operation)
-	assert.Equal("test", e1.Tags["system"])
-	assert.NotZero(e1.Duration)
-	assert.NotZero(e1.Start)
+	assertEqual(t, "e1", e1.Operation)
+	assertEqual(t, "test", e1.Tags["system"])
+	assertNotZero(t, e1.Duration)
+	assertNotZero(t, e1.Start)
 
 	// I hope your clocks work...
 	e2 := getEvent(evtDecoder)
-	assert.Equal("e2", e2.Operation)
-	assert.Equal("test", e2.Tags["system"])
-	assert.NotZero(e2.Duration)
-	assert.True(e1.Start.Nanosecond() < e2.Start.Nanosecond())
+	assertEqual(t, "e2", e2.Operation)
+	assertEqual(t, "test", e2.Tags["system"])
+	assertNotZero(t, e2.Duration)
 
 	er := getEvent(evtDecoder)
-	assert.Equal("root", er.Operation)
-	assert.Equal("test", er.Tags["system"])
-	assert.True(er.Duration.Nanoseconds() > e1.Duration.Nanoseconds()+e2.Duration.Nanoseconds())
-	assert.NotZero(er.Start)
+	assertEqual(t, "root", er.Operation)
+	assertEqual(t, "test", er.Tags["system"])
+	assertNotZero(t, er.Start)
 
 }
 
 func TestEventSerialization(t *testing.T) {
-	assert := assert.New(t)
-
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
@@ -267,28 +263,32 @@ func TestEventSerialization(t *testing.T) {
 	// **imagine** that we are putting `bc` (byte context) into a protobuf message
 	// and send the message to another peer on the network
 	bc, err := lgr.SerializeContext(sndctx)
-	assert.NoError(err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// now  **imagine** some peer getting a protobuf message and extracting
 	// `bc` from the message to continue the operation
 	rcvctx, err := lgr.StartFromParentState(context.Background(), "recv", bc)
-	assert.NoError(err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// at some point the sender completes their operation
 	lgr.Finish(sndctx)
 	e := getEvent(evtDecoder)
-	assert.Equal("send", e.Operation)
-	assert.Equal("test", e.Tags["system"])
-	assert.NotZero(e.Start)
-	assert.NotZero(e.Start)
+	assertEqual(t, "send", e.Operation)
+	assertEqual(t, "test", e.Tags["system"])
+	assertNotZero(t, e.Start)
+	assertNotZero(t, e.Start)
 
 	// and then the receiver finishes theirs
 	lgr.Finish(rcvctx)
 	e = getEvent(evtDecoder)
-	assert.Equal("recv", e.Operation)
-	assert.Equal("test", e.Tags["system"])
-	assert.NotZero(e.Start)
-	assert.NotZero(e.Start)
+	assertEqual(t, "recv", e.Operation)
+	assertEqual(t, "test", e.Tags["system"])
+	assertNotZero(t, e.Start)
+	assertNotZero(t, e.Start)
 
 }
 
@@ -309,7 +309,6 @@ func getEvent(ed *json.Decoder) tracer.LoggableSpan {
 
 // DEPRECATED methods tested below
 func TestEventBegin(t *testing.T) {
-	assert := assert.New(t)
 
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
@@ -340,18 +339,17 @@ func TestEventBegin(t *testing.T) {
 	var ls tracer.LoggableSpan
 	evtDecoder.Decode(&ls)
 
-	assert.Equal("event", ls.Operation)
-	assert.Equal("test", ls.Tags["system"])
-	assert.Contains(ls.Logs[0].Field[0].Value, "val")
-	assert.Contains(ls.Logs[1].Field[0].Value, "bar")
-	assert.Contains(ls.Logs[2].Field[0].Value, "gerrr im an error")
+	assertEqual(t, "event", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
+	assertEqual(t, ls.Logs[0].Field[0].Value, "val")
+	assertEqual(t, ls.Logs[1].Field[0].Value, "bar")
+	assertEqual(t, ls.Logs[2].Field[0].Value, "gerrr im an error")
 	// greater than zero should work for now
-	assert.NotZero(ls.Duration)
-	assert.NotZero(ls.Start)
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
 }
 
 func TestEventBeginWithErr(t *testing.T) {
-	assert := assert.New(t)
 
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
@@ -379,12 +377,12 @@ func TestEventBeginWithErr(t *testing.T) {
 	var ls tracer.LoggableSpan
 	evtDecoder.Decode(&ls)
 
-	assert.Equal("event", ls.Operation)
-	assert.Equal("test", ls.Tags["system"])
-	assert.Contains(ls.Logs[0].Field[0].Value, "val")
-	assert.Contains(ls.Logs[1].Field[0].Value, "bar")
-	assert.Contains(ls.Logs[2].Field[0].Value, "gerrr im an error")
+	assertEqual(t, "event", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
+	assertEqual(t, ls.Logs[0].Field[0].Value, "val")
+	assertEqual(t, ls.Logs[1].Field[0].Value, "bar")
+	assertEqual(t, ls.Logs[2].Field[0].Value, "gerrr im an error")
 	// greater than zero should work for now
-	assert.NotZero(ls.Duration)
-	assert.NotZero(ls.Start)
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
 }
