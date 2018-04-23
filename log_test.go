@@ -7,9 +7,9 @@ import (
 	"io"
 	"testing"
 
-	"github.com/frrist/testify/assert"
 	tracer "github.com/ipfs/go-log/tracer"
 	writer "github.com/ipfs/go-log/writer"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSingleEvent(t *testing.T) {

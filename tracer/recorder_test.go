@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/frrist/testify/assert"
 	writer "github.com/ipfs/go-log/writer"
 	opentrace "github.com/opentracing/opentracing-go"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSpanRecorder(t *testing.T) {
