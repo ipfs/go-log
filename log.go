@@ -67,8 +67,11 @@ type EventLogger interface {
 	FinishWithErr(ctx context.Context, err error)
 
 	SetErr(ctx context.Context, err error)
-	LogKV(ctx context.Context, key string, value interface{})
+
+	LogKV(ctx context.Context, alternatingKeyValues ...interface{})
+
 	SetTag(ctx context.Context, key string, value interface{})
+	SetTags(ctx context.Context, tags map[string]interface{})
 
 	SerializeContext(ctx context.Context) ([]byte, error)
 }
@@ -178,15 +181,20 @@ func (el *eventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
 	return carrier.Bytes(), nil
 }
 
-// LogKV logs key `k` and value `v` on the span associated with `ctx`
-func (el *eventLogger) LogKV(ctx context.Context, k string, v interface{}) {
+// LogKV records key:value logging data about an event stored in `ctx`
+// Eexample:
+//    log.LogKV(
+//        "error", "resolve failure",
+//        "type", "cache timeout",
+//        "waited.millis", 1500)
+func (el *eventLogger) LogKV(ctx context.Context, alternatingKeyValues ...interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
 		_, file, line, _ := runtime.Caller(1)
 		log.Errorf("LogKV with no Span in context called on %s:%d", path.Base(file), line)
 		return
 	}
-	span.LogKV(k, v)
+	span.LogKV(alternatingKeyValues...)
 }
 
 // SetTag tags key `k` and value `v` on the span associated with `ctx`
@@ -198,6 +206,24 @@ func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
 		return
 	}
 	span.SetTag(k, v)
+}
+
+// SetTags tags keys from the `tags` maps on the span associated with `ctx`
+// Example:
+//    log.SetTags(ctx, map[string]{
+//		"tag": bizStruct,
+//      "bar": fizStruct,
+//		})
+func (el *eventLogger) SetTags(ctx context.Context, tags map[string]interface{}) {
+	span := opentrace.SpanFromContext(ctx)
+	if span == nil {
+		_, file, line, _ := runtime.Caller(1)
+		log.Errorf("SetTags with no Span in context called on %s:%d", path.Base(file), line)
+		return
+	}
+	for k := range tags {
+		span.SetTag(k, tags[k])
+	}
 }
 
 // SetErr tags the span associated with `ctx` to reflect an error occured, and

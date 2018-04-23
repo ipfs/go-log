@@ -118,6 +118,92 @@ func TestEventWithTag(t *testing.T) {
 	assert.NotZero(ls.Start)
 }
 
+func TestEventWithTags(t *testing.T) {
+	assert := assert.New(t)
+
+	// Set up a pipe to use as backend and log stream
+	lgs, lgb := io.Pipe()
+	// event logs will be written to lgb
+	// event logs will be read from lgs
+	writer.WriterGroup.AddWriter(lgb)
+
+	// create a logger
+	lgr := Logger("test")
+
+	// create a root context
+	ctx := context.Background()
+
+	// start an event
+	ctx = lgr.Start(ctx, "event1")
+	lgr.SetTags(ctx, map[string]interface{}{
+		"tk1": "tv1",
+		"tk2": "tv2",
+	})
+
+	// finish the event
+	lgr.Finish(ctx)
+
+	// decode the log event
+	var ls tracer.LoggableSpan
+	evtDecoder := json.NewDecoder(lgs)
+	evtDecoder.Decode(&ls)
+
+	// event name and system should be
+	assert.Equal("event1", ls.Operation)
+	assert.Equal("test", ls.Tags["system"])
+	assert.Equal("tv1", ls.Tags["tk1"])
+	assert.Equal("tv2", ls.Tags["tk2"])
+	// greater than zero should work for now
+	assert.NotZero(ls.Duration)
+	assert.NotZero(ls.Start)
+}
+
+func TestEventWithLogs(t *testing.T) {
+	assert := assert.New(t)
+
+	// Set up a pipe to use as backend and log stream
+	lgs, lgb := io.Pipe()
+	// event logs will be written to lgb
+	// event logs will be read from lgs
+	writer.WriterGroup.AddWriter(lgb)
+
+	// create a logger
+	lgr := Logger("test")
+
+	// create a root context
+	ctx := context.Background()
+
+	// start an event
+	ctx = lgr.Start(ctx, "event1")
+	lgr.LogKV(ctx, "log1", "logv1", "log2", "logv2")
+	lgr.LogKV(ctx, "treeLog", []string{"Pine", "Juniper", "Spruce", "Ginkgo"})
+
+	// finish the event
+	lgr.Finish(ctx)
+
+	// decode the log event
+	var ls tracer.LoggableSpan
+	evtDecoder := json.NewDecoder(lgs)
+	evtDecoder.Decode(&ls)
+
+	// event name and system should be
+	assert.Equal("event1", ls.Operation)
+	assert.Equal("test", ls.Tags["system"])
+
+	assert.Equal("log1", ls.Logs[0].Field[0].Key)
+	assert.Equal("logv1", ls.Logs[0].Field[0].Value)
+	assert.Equal("log2", ls.Logs[0].Field[1].Key)
+	assert.Equal("logv2", ls.Logs[0].Field[1].Value)
+
+	// Should be a differnt log (different timestamp)
+	assert.Equal("treeLog", ls.Logs[1].Field[0].Key)
+	assert.Equal("[Pine Juniper Spruce Ginkgo]", ls.Logs[1].Field[0].Value)
+
+	// greater than zero should work for now
+	assert.NotZero(ls.Duration)
+	assert.NotZero(ls.Start)
+}
+
 func TestMultiEvent(t *testing.T) {
 	assert := assert.New(t)
 
