@@ -100,14 +100,6 @@ type eventLogger struct {
 	// TODO add log-level
 }
 
-type activeSpanKeyType struct{}
-
-var activeSpanKey = activeSpanKeyType{}
-
-type activeSpan struct {
-	isFinished bool
-}
-
 // Start starts an opentracing span with `operationName`, using
 // any Span found within `ctx` as a ChildOfRef. If no such parent could be
 // found, StartSpanFromContext creates a root (parentless) Span.
@@ -123,10 +115,6 @@ type activeSpan struct {
 //        ...
 //    }
 func (el *eventLogger) Start(ctx context.Context, operationName string) context.Context {
-	as := &activeSpan{
-		isFinished: false,
-	}
-	ctx = context.WithValue(ctx, activeSpanKey, as)
 	span, ctx := opentrace.StartSpanFromContext(ctx, operationName)
 	span.SetTag("system", el.system)
 	return ctx
@@ -158,10 +146,6 @@ func (el *eventLogger) StartFromParentState(ctx context.Context, operationName s
 		return nil, err
 	}
 
-	as := &activeSpan{
-		isFinished: false,
-	}
-	ctx = context.WithValue(ctx, activeSpanKey, as)
 	//TODO RPCServerOption is probably not the best tag, as this is likely from a peer
 	span, ctx := opentrace.StartSpanFromContext(ctx, operationName, otExt.RPCServerOption(sc))
 	span.SetTag("system", el.system)
@@ -257,17 +241,7 @@ func (el *eventLogger) Finish(ctx context.Context) {
 		log.Errorf("Finish with no Span in context called on %s:%d", path.Base(file), line)
 		return
 	}
-
-	//programmer error if this fails to cast - no error check
-	val := ctx.Value(activeSpanKey)
-	as := val.(*activeSpan)
-	if as.isFinished {
-		_, file, line, _ := runtime.Caller(1)
-		log.Errorf("The span has already been finished in %s:%d", path.Base(file), line)
-	} else {
-		span.Finish()
-		as.isFinished = true
-	}
+	span.Finish()
 }
 
 // FinishWithErr completes the span associated with `ctx` by
