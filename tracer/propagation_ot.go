@@ -12,10 +12,10 @@ import (
 )
 
 type textMapPropagator struct {
-	tracer *tracerImpl
+	tracer *LoggableTracer
 }
 type binaryPropagator struct {
-	tracer *tracerImpl
+	tracer *LoggableTracer
 }
 
 const (

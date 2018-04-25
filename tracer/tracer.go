@@ -104,7 +104,7 @@ func DefaultOptions() Options {
 
 // NewWithOptions creates a customized Tracer.
 func NewWithOptions(opts Options) opentracing.Tracer {
-	rval := &tracerImpl{options: opts}
+	rval := &LoggableTracer{options: opts}
 	rval.accessorPropagator = &accessorPropagator{rval}
 	return rval
 }
@@ -120,14 +120,14 @@ func New(recorder SpanRecorder) opentracing.Tracer {
 }
 
 // Implements the `Tracer` interface.
-type tracerImpl struct {
+type LoggableTracer struct {
 	options            Options
 	textPropagator     *textMapPropagator
 	binaryPropagator   *binaryPropagator
 	accessorPropagator *accessorPropagator
 }
 
-func (t *tracerImpl) StartSpan(
+func (t *LoggableTracer) StartSpan(
 	operationName string,
 	opts ...opentracing.StartSpanOption,
 ) opentracing.Span {
@@ -138,7 +138,7 @@ func (t *tracerImpl) StartSpan(
 	return t.StartSpanWithOptions(operationName, sso)
 }
 
-func (t *tracerImpl) getSpan() *spanImpl {
+func (t *LoggableTracer) getSpan() *spanImpl {
 	if t.options.EnableSpanPool {
 		sp := spanPool.Get().(*spanImpl)
 		sp.reset()
@@ -147,7 +147,7 @@ func (t *tracerImpl) getSpan() *spanImpl {
 	return &spanImpl{}
 }
 
-func (t *tracerImpl) StartSpanWithOptions(
+func (t *LoggableTracer) StartSpanWithOptions(
 	operationName string,
 	opts opentracing.StartSpanOptions,
 ) opentracing.Span {
@@ -203,7 +203,7 @@ ReferencesLoop:
 	)
 }
 
-func (t *tracerImpl) startSpanInternal(
+func (t *LoggableTracer) startSpanInternal(
 	sp *spanImpl,
 	operationName string,
 	startTime time.Time,
@@ -229,7 +229,7 @@ type delegatorType struct{}
 // Delegator is the format to use for DelegatingCarrier.
 var Delegator delegatorType
 
-func (t *tracerImpl) Inject(sc opentracing.SpanContext, format interface{}, carrier interface{}) error {
+func (t *LoggableTracer) Inject(sc opentracing.SpanContext, format interface{}, carrier interface{}) error {
 	switch format {
 	case opentracing.TextMap, opentracing.HTTPHeaders:
 		return t.textPropagator.Inject(sc, carrier)
@@ -242,7 +242,7 @@ func (t *tracerImpl) Inject(sc opentracing.SpanContext, format interface{}, carr
 	return opentracing.ErrUnsupportedFormat
 }
 
-func (t *tracerImpl) Extract(format interface{}, carrier interface{}) (opentracing.SpanContext, error) {
+func (t *LoggableTracer) Extract(format interface{}, carrier interface{}) (opentracing.SpanContext, error) {
 	switch format {
 	case opentracing.TextMap, opentracing.HTTPHeaders:
 		return t.textPropagator.Extract(carrier)
@@ -255,6 +255,6 @@ func (t *tracerImpl) Extract(format interface{}, carrier interface{}) (opentraci
 	return nil, opentracing.ErrUnsupportedFormat
 }
 
-func (t *tracerImpl) Options() Options {
+func (t *LoggableTracer) Options() Options {
 	return t.options
 }

@@ -22,10 +22,10 @@ type Span interface {
 	Start() time.Time
 }
 
-// Implements the `Span` interface. Created via tracerImpl (see
+// Implements the `Span` interface. Created via LoggableTracer (see
 // `loggabletracer.New()`).
 type spanImpl struct {
-	tracer     *tracerImpl
+	tracer     *LoggableTracer
 	event      func(SpanEvent)
 	sync.Mutex // protects the fields below
 	raw        RawSpan

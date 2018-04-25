@@ -6,9 +6,6 @@ import (
 	"os"
 
 	logging "github.com/whyrusleeping/go-logging"
-
-	tracer "github.com/ipfs/go-log/tracer"
-	opentrace "github.com/opentracing/opentracing-go"
 )
 
 func init() {
@@ -62,12 +59,6 @@ func SetupLogging() {
 	}
 
 	SetAllLoggers(lvl)
-
-	// TracerPlugins are instantiated after this, so use loggable tracer
-	// by default, if a TracerPlugin is added it will override this
-	lgblRecorder := tracer.NewLoggableRecorder()
-	lgblTracer := tracer.New(lgblRecorder)
-	opentrace.SetGlobalTracer(lgblTracer)
 }
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG

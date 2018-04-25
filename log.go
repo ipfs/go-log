@@ -8,9 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"path"
+	"reflect"
 	"runtime"
+	"sync"
 	"time"
 
+	tracer "github.com/ipfs/go-log/tracer"
 	writer "github.com/ipfs/go-log/writer"
 
 	opentrace "github.com/opentracing/opentracing-go"
@@ -90,6 +93,61 @@ func Logger(system string) EventLogger {
 	logger := getLogger(system)
 
 	return &eventLogger{system: system, StandardLogger: logger}
+}
+
+// a lock for enableding a disabling tracer
+var lkTrace = sync.Mutex{}
+
+// a count of consumers using the tracer
+var numTrace = 0
+
+// EnableLoggableTracer will enable the loggable tracer iff the GlobalTracer
+// is the NoopTracer or LoggableTracer
+func EnableLoggableTracer() {
+	curTracer := reflect.TypeOf(opentrace.GlobalTracer())
+	// the tracers we can override the global tracer for
+	NoopType := reflect.TypeOf(opentrace.NoopTracer{})
+	LoggableType := reflect.TypeOf(&tracer.LoggableTracer{})
+
+	// we should do nothing if we are using a 3rd party tracer
+	// e.g. curTracer == "*jaeger.Tracer" means there is a plugin
+	if !(curTracer == NoopType || curTracer == LoggableType) {
+		return
+	}
+
+	// keep a ref count so we don't disable the tracer on an open stream
+	lkTrace.Lock()
+	defer lkTrace.Unlock()
+	if numTrace == 0 {
+		lgblRecorder := tracer.NewLoggableRecorder()
+		lgblTracer := tracer.New(lgblRecorder)
+		opentrace.SetGlobalTracer(lgblTracer)
+	}
+	numTrace++
+}
+
+// DisableLoggableTracer will disbale the loggable tracer if no other tracer is
+// being used
+func DisableLoggableTracer() {
+	// the current global tracer
+	curTracer := reflect.TypeOf(opentrace.GlobalTracer())
+	// the tracers we can override the global tracer for
+	NoopType := reflect.TypeOf(opentrace.NoopTracer{})
+	LoggableType := reflect.TypeOf(&tracer.LoggableTracer{})
+
+	// we should do nothing if we are using a 3rd party tracer
+	// e.g. curTracer == "*jaeger.Tracer" means there is a plugin
+	// this is probs reduntant
+	if !(curTracer == NoopType || curTracer == LoggableType) {
+		return
+	}
+
+	lkTrace.Lock()
+	defer lkTrace.Unlock()
+	if numTrace == 1 {
+		opentrace.SetGlobalTracer(opentrace.NoopTracer{})
+	}
+	numTrace--
 }
 
 // eventLogger implements the EventLogger and wraps a go-logging Logger
