@@ -28,8 +28,6 @@ func TestSingleEvent(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 
 	// create a logger
@@ -63,8 +61,6 @@ func TestSingleEventWithErr(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 
 	// create a logger
@@ -99,8 +95,6 @@ func TestEventWithTag(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 
 	// create a logger
@@ -135,8 +129,6 @@ func TestEventWithTags(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 
 	// create a logger
@@ -175,8 +167,6 @@ func TestEventWithLogs(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 
 	// create a logger
@@ -221,8 +211,6 @@ func TestMultiEvent(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 	evtDecoder := json.NewDecoder(lgs)
 
@@ -263,8 +251,6 @@ func TestEventSerialization(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 	evtDecoder := json.NewDecoder(lgs)
 
@@ -328,8 +314,6 @@ func TestEventBegin(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 	evtDecoder := json.NewDecoder(lgs)
 
@@ -371,8 +355,6 @@ func TestEventBeginWithErr(t *testing.T) {
 	lgs, lgb := io.Pipe()
 	// event logs will be written to lgb
 	// event logs will be read from lgs
-	EnableLoggableTracer()
-	defer DisableLoggableTracer()
 	writer.WriterGroup.AddWriter(lgb)
 	evtDecoder := json.NewDecoder(lgs)
 

@@ -3,6 +3,7 @@ package loggabletracer
 import (
 	"time"
 
+	writer "github.com/ipfs/go-log/writer"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -131,6 +132,11 @@ func (t *LoggableTracer) StartSpan(
 	operationName string,
 	opts ...opentracing.StartSpanOption,
 ) opentracing.Span {
+
+	if !writer.WriterGroup.Active() {
+		return opentracing.NoopTracer.StartSpan(opentracing.NoopTracer{}, operationName)
+	}
+
 	sso := opentracing.StartSpanOptions{}
 	for _, o := range opts {
 		o.Apply(&sso)
@@ -151,6 +157,9 @@ func (t *LoggableTracer) StartSpanWithOptions(
 	operationName string,
 	opts opentracing.StartSpanOptions,
 ) opentracing.Span {
+	if !writer.WriterGroup.Active() {
+		return opentracing.NoopTracer.StartSpan(opentracing.NoopTracer{}, operationName)
+	}
 	// Start time.
 	startTime := opts.StartTime
 	if startTime.IsZero() {
@@ -230,6 +239,9 @@ type delegatorType struct{}
 var Delegator delegatorType
 
 func (t *LoggableTracer) Inject(sc opentracing.SpanContext, format interface{}, carrier interface{}) error {
+	if !writer.WriterGroup.Active() {
+		return opentracing.NoopTracer.Inject(opentracing.NoopTracer{}, sc, format, carrier)
+	}
 	switch format {
 	case opentracing.TextMap, opentracing.HTTPHeaders:
 		return t.textPropagator.Inject(sc, carrier)
@@ -243,6 +255,9 @@ func (t *LoggableTracer) Inject(sc opentracing.SpanContext, format interface{}, 
 }
 
 func (t *LoggableTracer) Extract(format interface{}, carrier interface{}) (opentracing.SpanContext, error) {
+	if !writer.WriterGroup.Active() {
+		return opentracing.NoopTracer.Extract(opentracing.NoopTracer{}, format, carrier)
+	}
 	switch format {
 	case opentracing.TextMap, opentracing.HTTPHeaders:
 		return t.textPropagator.Extract(carrier)
