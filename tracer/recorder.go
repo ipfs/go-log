@@ -3,6 +3,7 @@ package loggabletracer
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	writer "github.com/ipfs/go-log/writer"
@@ -71,7 +72,8 @@ func (r *LoggableSpanRecorder) RecordSpan(span RawSpan) {
 
 	out, err := json.Marshal(spanlog)
 	if err != nil {
-		fmt.Errorf("ERROR FORMATTING SPAN ENTRY: %s", err)
+		fmt.Fprintf(os.Stderr, "ERROR FORMATTING SPAN ENTRY: %s\n", err)
+		return
 	}
 
 	writer.WriterGroup.Write(append(out, '\n'))
