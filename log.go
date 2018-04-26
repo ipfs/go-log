@@ -4,15 +4,20 @@
 package log
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"path"
+	"runtime"
 	"time"
+
+	writer "github.com/ipfs/go-log/writer"
 
 	opentrace "github.com/opentracing/opentracing-go"
 	otExt "github.com/opentracing/opentracing-go/ext"
-	otl "github.com/opentracing/opentracing-go/log"
 )
+
+var log = Logger("eventlog")
 
 // StandardLogger provides API compatibility with standard printf loggers
 // eg. go-logging
@@ -49,11 +54,26 @@ type EventLogger interface {
 	//
 	// Finally the timestamp and package name are added to the accumulator and
 	// the metadata is logged.
+	// DEPRECATED
 	Event(ctx context.Context, event string, m ...Loggable)
 
+	// DEPRECATED
 	EventBegin(ctx context.Context, event string, m ...Loggable) *EventInProgress
 
-	EventBeginInContext(ctx context.Context, event string, m ...Loggable) context.Context
+	Start(ctx context.Context, name string) context.Context
+	StartFromParentState(ctx context.Context, name string, parent []byte) (context.Context, error)
+
+	Finish(ctx context.Context)
+	FinishWithErr(ctx context.Context, err error)
+
+	SetErr(ctx context.Context, err error)
+
+	LogKV(ctx context.Context, alternatingKeyValues ...interface{})
+
+	SetTag(ctx context.Context, key string, value interface{})
+	SetTags(ctx context.Context, tags map[string]interface{})
+
+	SerializeContext(ctx context.Context) ([]byte, error)
 }
 
 // Logger retrieves an event logger by name
@@ -80,34 +100,194 @@ type eventLogger struct {
 	// TODO add log-level
 }
 
-func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ...Loggable) *EventInProgress {
-	start := time.Now()
-	el.Event(ctx, fmt.Sprintf("%sBegin", event), metadata...)
+// Start starts an opentracing span with `operationName`, using
+// any Span found within `ctx` as a ChildOfRef. If no such parent could be
+// found, StartSpanFromContext creates a root (parentless) Span.
+//
+// The return value is a context.Context object built around the
+// returned Span.
+//
+// Example usage:
+//
+//    SomeFunction(ctx context.Context, ...) {
+//        ctx := log.Start(ctx, "SomeFunction")
+//        defer log.Finish(ctx)
+//        ...
+//    }
+func (el *eventLogger) Start(ctx context.Context, operationName string) context.Context {
+	span, ctx := opentrace.StartSpanFromContext(ctx, operationName)
+	span.SetTag("system", el.system)
+	return ctx
+}
 
-	span, ctx := opentrace.StartSpanFromContext(ctx, event)
+// TODO: need clearer examples and description
+// StartFromParentState starts an opentracing span with `operationName`, using
+// any Span found within `ctx` as a ChildOfRef. If no such parent could be
+// found, StartSpanFromContext creates a root (parentless) Span.
+//
+// StartFromParentState will attempt to deserialize a SpanContext from `parent`,
+// using any Span found within to continue the trace
+//
+// The return value is a context.Context object built around the
+// returned Span.
+//
+// An error is returned when `parent` cannot be deserialized to a SpanContext
+//
+// Example usage:
+//
+//    SomeFunction(ctx context.Context, ...) {
+//        ctx := log.StartFromParentState(ctx, "SomeFunction", bParent)
+//        defer log.Finish(ctx)
+//        ...
+//    }
+func (el *eventLogger) StartFromParentState(ctx context.Context, operationName string, parent []byte) (context.Context, error) {
+	sc, err := deserializeContext(parent)
+	if err != nil {
+		return nil, err
+	}
+
+	//TODO RPCServerOption is probably not the best tag, as this is likely from a peer
+	span, ctx := opentrace.StartSpanFromContext(ctx, operationName, otExt.RPCServerOption(sc))
+	span.SetTag("system", el.system)
+	return ctx, nil
+}
+
+// SerializeContext takes the SpanContext instance stored in `ctx`, and Seralizes
+// it to bytes.
+func (el *eventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
+	gTracer := opentrace.GlobalTracer()
+	b := make([]byte, 0)
+	carrier := bytes.NewBuffer(b)
+	span := opentrace.SpanFromContext(ctx)
+	if err := gTracer.Inject(span.Context(), opentrace.Binary, carrier); err != nil {
+		return nil, err
+	}
+	return carrier.Bytes(), nil
+}
+
+// LogKV records key:value logging data about an event stored in `ctx`
+// Eexample:
+//    log.LogKV(
+//        "error", "resolve failure",
+//        "type", "cache timeout",
+//        "waited.millis", 1500)
+func (el *eventLogger) LogKV(ctx context.Context, alternatingKeyValues ...interface{}) {
+	span := opentrace.SpanFromContext(ctx)
+	if span == nil {
+		_, file, line, _ := runtime.Caller(1)
+		log.Errorf("LogKV with no Span in context called on %s:%d", path.Base(file), line)
+		return
+	}
+	span.LogKV(alternatingKeyValues...)
+}
+
+// SetTag tags key `k` and value `v` on the span associated with `ctx`
+func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
+	span := opentrace.SpanFromContext(ctx)
+	if span == nil {
+		_, file, line, _ := runtime.Caller(1)
+		log.Errorf("SetTag with no Span in context called on %s:%d", path.Base(file), line)
+		return
+	}
+	span.SetTag(k, v)
+}
+
+// SetTags tags keys from the `tags` maps on the span associated with `ctx`
+// Example:
+//    log.SetTags(ctx, map[string]{
+//		"tag": bizStruct,
+//      "bar": fizStruct,
+//		})
+func (el *eventLogger) SetTags(ctx context.Context, tags map[string]interface{}) {
+	span := opentrace.SpanFromContext(ctx)
+	if span == nil {
+		_, file, line, _ := runtime.Caller(1)
+		log.Errorf("SetTags with no Span in context called on %s:%d", path.Base(file), line)
+		return
+	}
+	for k := range tags {
+		span.SetTag(k, tags[k])
+	}
+}
+
+// SetErr tags the span associated with `ctx` to reflect an error occured, and
+// logs the value `err` under key `error`
+func (el *eventLogger) SetErr(ctx context.Context, err error) {
+	span := opentrace.SpanFromContext(ctx)
+	if span == nil {
+		_, file, line, _ := runtime.Caller(1)
+		log.Errorf("SetErr with no Span in context called on %s:%d", path.Base(file), line)
+		return
+	}
+	if err == nil {
+		return
+	}
+
+	otExt.Error.Set(span, true)
+	span.LogKV("error", err.Error())
+}
+
+// Finish completes the span associated with `ctx` by
+// setting the end timestamp and finalizing the Span state.
+//
+// Finish() must be the last call made to any span instance, and to do
+// otherwise leads to undefined behavior.
+// Finish will do its best to notify (log) when used in correctly
+//		.e.g called twice, or called on a spanless `ctx`
+func (el *eventLogger) Finish(ctx context.Context) {
+	span := opentrace.SpanFromContext(ctx)
+	if span == nil {
+		_, file, line, _ := runtime.Caller(1)
+		log.Errorf("Finish with no Span in context called on %s:%d", path.Base(file), line)
+		return
+	}
+	span.Finish()
+}
+
+// FinishWithErr completes the span associated with `ctx` by
+// setting the end timestamp and finalizing the Span state, in addition to
+// calling the `SetErr` method first
+//
+// FinishWithErr() must be the last call made to any span instance, and to do
+// otherwise leads to undefined behavior.
+// FinishWithErr will do its best to notify (log) when used in correctly
+//		.e.g called twice, or called on a spanless `ctx`
+func (el *eventLogger) FinishWithErr(ctx context.Context, err error) {
+	el.SetErr(ctx, err)
+	el.Finish(ctx)
+}
+
+func deserializeContext(bCtx []byte) (opentrace.SpanContext, error) {
+	gTracer := opentrace.GlobalTracer()
+	carrier := bytes.NewReader(bCtx)
+	spanContext, err := gTracer.Extract(opentrace.Binary, carrier)
+	if err != nil {
+		log.Warning("Failed to deserialize context %s", err)
+		return nil, err
+	}
+	return spanContext, nil
+}
+
+// DEPRECATED use `Start`
+func (el *eventLogger) EventBegin(ctx context.Context, event string, metadata ...Loggable) *EventInProgress {
+	ctx = el.Start(ctx, event)
+
+	for _, m := range metadata {
+		for l, v := range m.Loggable() {
+			el.LogKV(ctx, l, v)
+		}
+	}
 
 	eip := &EventInProgress{}
 	eip.doneFunc = func(additional []Loggable) {
-		metadata = append(metadata, additional...)                      // anything added during the operation
-		metadata = append(metadata, LoggableMap(map[string]interface{}{ // finally, duration of event
-			"duration": time.Now().Sub(start),
-		}))
-
-		el.Event(ctx, event, metadata...)
-		if traceingDisabled() {
-			return
-		}
-		otExt.Component.Set(span, el.system)
-		for _, m := range metadata {
+		// anything added during the operation
+		// e.g. deprecated methods event.Append(...) or event.SetError(...)
+		for _, m := range eip.loggables {
 			for l, v := range m.Loggable() {
-				if l == "error" {
-					otExt.Error.Set(span, true)
-				}
-				f := getOpentracingField(l, v)
-				span.LogFields(f)
+				el.LogKV(ctx, l, v)
 			}
 		}
-		span.Finish()
+		el.Finish(ctx)
 	}
 	return eip
 }
@@ -116,24 +296,11 @@ type activeEventKeyType struct{}
 
 var activeEventKey = activeEventKeyType{}
 
-// Stores an event in a context to be finished at a later point
-func (el *eventLogger) EventBeginInContext(ctx context.Context, event string, metadata ...Loggable) context.Context {
-	eip := el.EventBegin(ctx, event, metadata...)
-	return context.WithValue(ctx, activeEventKey, eip)
-}
-
-// Will complete an event if there is one in ctx
-func MaybeFinishEvent(ctx context.Context) {
-	val := ctx.Value(activeEventKey)
-	if eip, ok := val.(*EventInProgress); ok {
-		eip.Done()
-	}
-}
-
+// DEPRECATED use `Start`
 func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Loggable) {
 
 	// short circuit if theres nothing to write to
-	if !WriterGroup.Active() {
+	if !writer.WriterGroup.Active() {
 		return
 	}
 
@@ -174,20 +341,23 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 		return
 	}
 
-	WriterGroup.Write(append(out, '\n'))
+	writer.WriterGroup.Write(append(out, '\n'))
 }
 
+// DEPRECATED
 // EventInProgress represent and event which is happening
 type EventInProgress struct {
 	loggables []Loggable
 	doneFunc  func([]Loggable)
 }
 
+// DEPRECATED use `LogKV` or `SetTag`
 // Append adds loggables to be included in the call to Done
 func (eip *EventInProgress) Append(l Loggable) {
 	eip.loggables = append(eip.loggables, l)
 }
 
+// DEPRECATED use `SetError(ctx, error)`
 // SetError includes the provided error
 func (eip *EventInProgress) SetError(err error) {
 	eip.loggables = append(eip.loggables, LoggableMap{
@@ -195,12 +365,14 @@ func (eip *EventInProgress) SetError(err error) {
 	})
 }
 
+// DEPRECATED use `Finish`
 // Done creates a new Event entry that includes the duration and appended
 // loggables.
 func (eip *EventInProgress) Done() {
 	eip.doneFunc(eip.loggables) // create final event with extra data
 }
 
+// DEPRECATED use `FinishWithErr`
 // DoneWithErr creates a new Event entry that includes the duration and appended
 // loggables. DoneWithErr accepts an error, if err is non-nil, it is set on
 // the EventInProgress. Otherwise the logic is the same as the `Done()` method
@@ -211,6 +383,7 @@ func (eip *EventInProgress) DoneWithErr(err error) {
 	eip.doneFunc(eip.loggables)
 }
 
+// DEPRECATED use `Finish`
 // Close is an alias for done
 func (eip *EventInProgress) Close() error {
 	eip.Done()
@@ -220,41 +393,4 @@ func (eip *EventInProgress) Close() error {
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
 func FormatRFC3339(t time.Time) string {
 	return t.UTC().Format(time.RFC3339Nano)
-}
-
-func getOpentracingField(l string, v interface{}) otl.Field {
-	var f otl.Field
-	switch v.(type) {
-	case bool:
-		f = otl.Bool(l, v.(bool))
-	case string:
-		f = otl.String(l, v.(string))
-	case float32:
-		f = otl.Float32(l, v.(float32))
-	case float64:
-		f = otl.Float64(l, v.(float64))
-	case int:
-		f = otl.Int(l, v.(int))
-	case int32:
-		f = otl.Int32(l, v.(int32))
-	case int64:
-		f = otl.Int64(l, v.(int64))
-	case uint32:
-		f = otl.Uint32(l, v.(uint32))
-	case uint64:
-		f = otl.Uint64(l, v.(uint64))
-	default:
-		f = otl.Object(l, v)
-	}
-	return f
-}
-
-func traceingDisabled() bool {
-	maybeTracer := opentrace.GlobalTracer()
-	switch maybeTracer.(type) {
-	case opentrace.NoopTracer:
-		return true
-	default:
-		return false
-	}
 }

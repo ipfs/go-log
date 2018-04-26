@@ -4,19 +4,17 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 )
 
 // MaxWriterBuffer specifies how big the writer buffer can get before
 // killing the writer.
 var MaxWriterBuffer = 512 * 1024
 
-var log = Logger("eventlog")
-
 // MirrorWriter implements a WriteCloser which syncs incoming bytes to multiple
 // [buffered] WriteClosers. They can be added with AddWriter().
 type MirrorWriter struct {
-	active   bool
-	activelk sync.Mutex
+	active uint32
 
 	// channel for incoming writers
 	writerAdd chan *writerAdd
@@ -91,9 +89,7 @@ func (mw *MirrorWriter) logRoutine() {
 		case wa := <-writerAdd:
 			mw.writers = append(mw.writers, newBufWriter(wa.w))
 
-			mw.activelk.Lock()
-			mw.active = true
-			mw.activelk.Unlock()
+			atomic.StoreUint32(&mw.active, 1)
 			close(wa.done)
 		}
 	}
@@ -122,9 +118,7 @@ func (mw *MirrorWriter) clearDeadWriters() {
 		}
 	}
 	if len(mw.writers) == 0 {
-		mw.activelk.Lock()
-		mw.active = false
-		mw.activelk.Unlock()
+		atomic.StoreUint32(&mw.active, 0)
 	}
 }
 
@@ -147,10 +141,7 @@ func (mw *MirrorWriter) AddWriter(w io.WriteCloser) {
 // Active returns if there is at least one Writer
 // attached to this MirrorWriter
 func (mw *MirrorWriter) Active() (active bool) {
-	mw.activelk.Lock()
-	active = mw.active
-	mw.activelk.Unlock()
-	return
+	return atomic.LoadUint32(&mw.active) == 1
 }
 
 func newBufWriter(w io.WriteCloser) *bufWriter {
@@ -211,7 +202,8 @@ func (bw *bufWriter) loop() {
 		for b := range nextCh {
 			_, err := bw.writer.Write(b)
 			if err != nil {
-				log.Info("eventlog write error: %s", err)
+				// TODO: need a way to notify there was an error here
+				// wouldn't want to log here as it could casue an infinite loop
 				bw.die()
 				return
 			}
