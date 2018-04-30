@@ -60,19 +60,86 @@ type EventLogger interface {
 	// DEPRECATED
 	EventBegin(ctx context.Context, event string, m ...Loggable) *EventInProgress
 
+	// Start starts an opentracing span with `name`, using
+	// any Span found within `ctx` as a ChildOfRef. If no such parent could be
+	// found, Start creates a root (parentless) Span.
+	//
+	// The return value is a context.Context object built around the
+	// returned Span.
+	//
+	// Example usage:
+	//
+	//    SomeFunction(ctx context.Context, ...) {
+	//        ctx := log.Start(ctx, "SomeFunction")
+	//        defer log.Finish(ctx)
+	//        ...
+	//    }
 	Start(ctx context.Context, name string) context.Context
+
+	// StartFromParentState starts an opentracing span with `name`, using
+	// any Span found within `ctx` as a ChildOfRef. If no such parent could be
+	// found, StartSpanFromParentState creates a root (parentless) Span.
+	//
+	// StartFromParentState will attempt to deserialize a SpanContext from `parent`,
+	// using any Span found within to continue the trace
+	//
+	// The return value is a context.Context object built around the
+	// returned Span.
+	//
+	// An error is returned when `parent` cannot be deserialized to a SpanContext
+	//
+	// Example usage:
+	//
+	//    SomeFunction(ctx context.Context, bParent []byte) {
+	//        ctx := log.StartFromParentState(ctx, "SomeFunction", bParent)
+	//        defer log.Finish(ctx)
+	//        ...
+	//    }
 	StartFromParentState(ctx context.Context, name string, parent []byte) (context.Context, error)
 
+	// Finish completes the span associated with `ctx`.
+	//
+	// Finish() must be the last call made to any span instance, and to do
+	// otherwise leads to undefined behavior.
+	// Finish will do its best to notify (log) when used in correctly
+	//		.e.g called twice, or called on a spanless `ctx`
 	Finish(ctx context.Context)
+
+	// FinishWithErr completes the span associated with `ctx` and also calls
+	// SetErr if `err` is non-nil
+	//
+	// FinishWithErr() must be the last call made to any span instance, and to do
+	// otherwise leads to undefined behavior.
+	// FinishWithErr will do its best to notify (log) when used in correctly
+	//		.e.g called twice, or called on a spanless `ctx`
 	FinishWithErr(ctx context.Context, err error)
 
+	// SetErr tags the span associated with `ctx` to reflect an error occured, and
+	// logs the value `err` under key `error`.
 	SetErr(ctx context.Context, err error)
 
+	// LogKV records key:value logging data about an event stored in `ctx`
+	// Eexample:
+	//    log.LogKV(
+	//        "error", "resolve failure",
+	//        "type", "cache timeout",
+	//        "waited.millis", 1500)
 	LogKV(ctx context.Context, alternatingKeyValues ...interface{})
 
+	// SetTag tags key `k` and value `v` on the span associated with `ctx`
 	SetTag(ctx context.Context, key string, value interface{})
+
+	// SetTags tags keys from the `tags` maps on the span associated with `ctx`
+	// Example:
+	//    log.SetTags(ctx, map[string]{
+	//		"type": bizStruct,
+	//      "request": req,
+	//		})
 	SetTags(ctx context.Context, tags map[string]interface{})
 
+	// SerializeContext takes the SpanContext instance stored in `ctx` and Seralizes
+	// it to bytes. An error is returned if the `ctx` cannot be serialized to
+	// a bytes array
 	SerializeContext(ctx context.Context) ([]byte, error)
 }
 
@@ -100,46 +167,12 @@ type eventLogger struct {
 	// TODO add log-level
 }
 
-// Start starts an opentracing span with `operationName`, using
-// any Span found within `ctx` as a ChildOfRef. If no such parent could be
-// found, StartSpanFromContext creates a root (parentless) Span.
-//
-// The return value is a context.Context object built around the
-// returned Span.
-//
-// Example usage:
-//
-//    SomeFunction(ctx context.Context, ...) {
-//        ctx := log.Start(ctx, "SomeFunction")
-//        defer log.Finish(ctx)
-//        ...
-//    }
 func (el *eventLogger) Start(ctx context.Context, operationName string) context.Context {
 	span, ctx := opentrace.StartSpanFromContext(ctx, operationName)
 	span.SetTag("system", el.system)
 	return ctx
 }
 
-// TODO: need clearer examples and description
-// StartFromParentState starts an opentracing span with `operationName`, using
-// any Span found within `ctx` as a ChildOfRef. If no such parent could be
-// found, StartSpanFromContext creates a root (parentless) Span.
-//
-// StartFromParentState will attempt to deserialize a SpanContext from `parent`,
-// using any Span found within to continue the trace
-//
-// The return value is a context.Context object built around the
-// returned Span.
-//
-// An error is returned when `parent` cannot be deserialized to a SpanContext
-//
-// Example usage:
-//
-//    SomeFunction(ctx context.Context, ...) {
-//        ctx := log.StartFromParentState(ctx, "SomeFunction", bParent)
-//        defer log.Finish(ctx)
-//        ...
-//    }
 func (el *eventLogger) StartFromParentState(ctx context.Context, operationName string, parent []byte) (context.Context, error) {
 	sc, err := deserializeContext(parent)
 	if err != nil {
@@ -152,8 +185,6 @@ func (el *eventLogger) StartFromParentState(ctx context.Context, operationName s
 	return ctx, nil
 }
 
-// SerializeContext takes the SpanContext instance stored in `ctx`, and Seralizes
-// it to bytes.
 func (el *eventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
 	gTracer := opentrace.GlobalTracer()
 	b := make([]byte, 0)
@@ -165,12 +196,6 @@ func (el *eventLogger) SerializeContext(ctx context.Context) ([]byte, error) {
 	return carrier.Bytes(), nil
 }
 
-// LogKV records key:value logging data about an event stored in `ctx`
-// Eexample:
-//    log.LogKV(
-//        "error", "resolve failure",
-//        "type", "cache timeout",
-//        "waited.millis", 1500)
 func (el *eventLogger) LogKV(ctx context.Context, alternatingKeyValues ...interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
@@ -181,7 +206,6 @@ func (el *eventLogger) LogKV(ctx context.Context, alternatingKeyValues ...interf
 	span.LogKV(alternatingKeyValues...)
 }
 
-// SetTag tags key `k` and value `v` on the span associated with `ctx`
 func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
@@ -192,12 +216,6 @@ func (el *eventLogger) SetTag(ctx context.Context, k string, v interface{}) {
 	span.SetTag(k, v)
 }
 
-// SetTags tags keys from the `tags` maps on the span associated with `ctx`
-// Example:
-//    log.SetTags(ctx, map[string]{
-//		"tag": bizStruct,
-//      "bar": fizStruct,
-//		})
 func (el *eventLogger) SetTags(ctx context.Context, tags map[string]interface{}) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
@@ -210,8 +228,6 @@ func (el *eventLogger) SetTags(ctx context.Context, tags map[string]interface{})
 	}
 }
 
-// SetErr tags the span associated with `ctx` to reflect an error occured, and
-// logs the value `err` under key `error`
 func (el *eventLogger) SetErr(ctx context.Context, err error) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
@@ -227,13 +243,6 @@ func (el *eventLogger) SetErr(ctx context.Context, err error) {
 	span.LogKV("error", err.Error())
 }
 
-// Finish completes the span associated with `ctx` by
-// setting the end timestamp and finalizing the Span state.
-//
-// Finish() must be the last call made to any span instance, and to do
-// otherwise leads to undefined behavior.
-// Finish will do its best to notify (log) when used in correctly
-//		.e.g called twice, or called on a spanless `ctx`
 func (el *eventLogger) Finish(ctx context.Context) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
@@ -244,14 +253,6 @@ func (el *eventLogger) Finish(ctx context.Context) {
 	span.Finish()
 }
 
-// FinishWithErr completes the span associated with `ctx` by
-// setting the end timestamp and finalizing the Span state, in addition to
-// calling the `SetErr` method first
-//
-// FinishWithErr() must be the last call made to any span instance, and to do
-// otherwise leads to undefined behavior.
-// FinishWithErr will do its best to notify (log) when used in correctly
-//		.e.g called twice, or called on a spanless `ctx`
 func (el *eventLogger) FinishWithErr(ctx context.Context, err error) {
 	el.SetErr(ctx, err)
 	el.Finish(ctx)
