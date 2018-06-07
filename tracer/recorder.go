@@ -27,6 +27,8 @@ func NewLoggableRecorder() *LoggableSpanRecorder {
 
 // Loggable Representation of a span, treated as an event log
 type LoggableSpan struct {
+	TraceID   uint64         `json:"TraceID"`
+	SpanID    uint64         `json:"SpanID"`
 	Operation string         `json:"Operation"`
 	Start     time.Time      `json:"Start"`
 	Duration  time.Duration  `json:"Duration"`
@@ -63,6 +65,8 @@ func (r *LoggableSpanRecorder) RecordSpan(span RawSpan) {
 	}
 
 	spanlog := &LoggableSpan{
+		TraceID:   span.Context.TraceID,
+		SpanID:    span.Context.SpanID,
 		Operation: span.Operation,
 		Start:     span.Start,
 		Duration:  span.Duration,
