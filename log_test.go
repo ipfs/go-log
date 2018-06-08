@@ -53,6 +53,8 @@ func TestSingleEvent(t *testing.T) {
 	// greater than zero should work for now
 	assertNotZero(t, ls.Duration)
 	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.TraceID)
+	assertNotZero(t, ls.SpanID)
 }
 
 func TestSingleEventWithErr(t *testing.T) {
@@ -88,6 +90,8 @@ func TestSingleEventWithErr(t *testing.T) {
 	// greater than zero should work for now
 	assertNotZero(t, ls.Duration)
 	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.TraceID)
+	assertNotZero(t, ls.SpanID)
 }
 
 func TestEventWithTag(t *testing.T) {
@@ -122,6 +126,8 @@ func TestEventWithTag(t *testing.T) {
 	// greater than zero should work for now
 	assertNotZero(t, ls.Duration)
 	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.TraceID)
+	assertNotZero(t, ls.SpanID)
 }
 
 func TestEventWithTags(t *testing.T) {
@@ -160,6 +166,8 @@ func TestEventWithTags(t *testing.T) {
 	// greater than zero should work for now
 	assertNotZero(t, ls.Duration)
 	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.TraceID)
+	assertNotZero(t, ls.SpanID)
 }
 
 func TestEventWithLogs(t *testing.T) {
@@ -204,6 +212,8 @@ func TestEventWithLogs(t *testing.T) {
 	// greater than zero should work for now
 	assertNotZero(t, ls.Duration)
 	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.TraceID)
+	assertNotZero(t, ls.SpanID)
 }
 
 func TestMultiEvent(t *testing.T) {
@@ -238,11 +248,14 @@ func TestMultiEvent(t *testing.T) {
 	assertEqual(t, "e2", e2.Operation)
 	assertEqual(t, "test", e2.Tags["system"])
 	assertNotZero(t, e2.Duration)
+	assertEqual(t, e1.TraceID, e2.TraceID)
 
 	er := getEvent(evtDecoder)
 	assertEqual(t, "root", er.Operation)
 	assertEqual(t, "test", er.Tags["system"])
 	assertNotZero(t, er.Start)
+	assertNotZero(t, er.TraceID)
+	assertNotZero(t, er.SpanID)
 
 }
 
@@ -288,7 +301,9 @@ func TestEventSerialization(t *testing.T) {
 	assertEqual(t, "recv", e.Operation)
 	assertEqual(t, "test", e.Tags["system"])
 	assertNotZero(t, e.Start)
-	assertNotZero(t, e.Start)
+	assertNotZero(t, e.Duration)
+	assertNotZero(t, e.TraceID)
+	assertNotZero(t, e.SpanID)
 
 }
 
@@ -347,6 +362,8 @@ func TestEventBegin(t *testing.T) {
 	// greater than zero should work for now
 	assertNotZero(t, ls.Duration)
 	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.SpanID)
+	assertNotZero(t, ls.TraceID)
 }
 
 func TestEventBeginWithErr(t *testing.T) {
@@ -385,4 +402,6 @@ func TestEventBeginWithErr(t *testing.T) {
 	// greater than zero should work for now
 	assertNotZero(t, ls.Duration)
 	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.SpanID)
+	assertNotZero(t, ls.TraceID)
 }
