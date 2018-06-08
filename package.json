@@ -18,9 +18,9 @@
     },
     {
       "author": "mattn",
-      "hash": "QmVrtgFpU2Q7FmuqHuiB62BZJrAtatBAxwFSmwYQpzA1eA",
+      "hash": "QmTsHcKgTQ4VeYZd8eKYpTXeLW7KNwkRD9wjnrwsV2sToq",
       "name": "go-colorable",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ],
   "gxVersion": "0.7.0",
