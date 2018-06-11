@@ -23,6 +23,48 @@ func assertNotZero(t *testing.T, a interface{}) {
 	}
 }
 
+// Test add remove writer
+func TestChangeWriter(t *testing.T) {
+
+	if writer.WriterGroup.Active() {
+		panic("here")
+	}
+
+	// create a logger
+	lgr := Logger("test")
+
+	// create a root context
+	ctx := context.Background()
+
+	// start an event
+	ctx1 := lgr.Start(ctx, "event1")
+
+	// Set up a pipe to use as backend and log stream
+	lgs, lgb := io.Pipe()
+	// event logs will be written to lgb
+	// event logs will be read from lgs
+	writer.WriterGroup.AddWriter(lgb)
+
+	ctx2 := lgr.Start(ctx1, "event2")
+
+	lgr.Finish(ctx2)
+	lgr.Finish(ctx1)
+
+	// decode the log event
+	var ls tracer.LoggableSpan
+	evtDecoder := json.NewDecoder(lgs)
+	evtDecoder.Decode(&ls)
+
+	// event name and system should be
+	assertEqual(t, "event2", ls.Operation)
+	assertEqual(t, "test", ls.Tags["system"])
+	// greater than zero should work for now
+	assertNotZero(t, ls.Duration)
+	assertNotZero(t, ls.Start)
+	assertNotZero(t, ls.TraceID)
+	assertNotZero(t, ls.SpanID)
+}
+
 func TestSingleEvent(t *testing.T) {
 	// Set up a pipe to use as backend and log stream
 	lgs, lgb := io.Pipe()
