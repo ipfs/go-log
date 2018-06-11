@@ -121,7 +121,7 @@ func GetSubsystems() []string {
 
 func getLogger(name string) *logging.Logger {
 	log := logging.MustGetLogger(name)
-	log.ExtraCalldepth = 1
+	log.ExtraCalldepth = 0 
 	loggers[name] = log
 	return log
 }
