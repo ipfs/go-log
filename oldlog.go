@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 
 	tracer "github.com/ipfs/go-log/tracer"
 
@@ -38,6 +39,7 @@ const (
 var ErrNoSuchLogger = errors.New("Error: No such logger")
 
 // loggers is the set of loggers in the system
+var loggerMutex sync.RWMutex
 var loggers = map[string]*logging.Logger{}
 
 // SetupLogging will initialize the logger backend and set the flags.
@@ -79,6 +81,10 @@ func SetDebugLogging() {
 // SetAllLoggers changes the logging.Level of all loggers to lvl
 func SetAllLoggers(lvl logging.Level) {
 	logging.SetLevel(lvl, "")
+
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
+
 	for n := range loggers {
 		logging.SetLevel(lvl, n)
 	}
@@ -98,6 +104,9 @@ func SetLogLevel(name, level string) error {
 		return nil
 	}
 
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
+
 	// Check if we have a logger by that name
 	if _, ok := loggers[name]; !ok {
 		return ErrNoSuchLogger
@@ -111,6 +120,8 @@ func SetLogLevel(name, level string) error {
 // GetSubsystems returns a slice containing the
 // names of the current loggers
 func GetSubsystems() []string {
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
 	subs := make([]string, 0, len(loggers))
 
 	for k := range loggers {
@@ -120,7 +131,14 @@ func GetSubsystems() []string {
 }
 
 func getLogger(name string) *logging.Logger {
-	log := logging.MustGetLogger(name)
-	loggers[name] = log
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+
+	log := loggers[name]
+	if log == nil {
+		log = logging.MustGetLogger(name)
+		loggers[name] = log
+	}
+
 	return log
 }
