@@ -31,8 +31,13 @@ var defaultLogFormat = "color"
 
 // Logging environment variables
 const (
+	// TODO these env names should be more general, IPFS is not the only project to
+	// use go-log
 	envLogging    = "IPFS_LOGGING"
 	envLoggingFmt = "IPFS_LOGGING_FMT"
+
+	envLoggingFile   = "GOLOG_FILE"          // /path/to/file
+	envLoggingSyslog = "GOLOG_SYSLOG_ENABLE" // 1 or 0
 )
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
@@ -43,15 +48,43 @@ var loggerMutex sync.RWMutex
 var loggers = map[string]*logging.Logger{}
 
 // SetupLogging will initialize the logger backend and set the flags.
+// TODO calling this in `init` pushes all configuration to env variables
+// - move it out of `init`? then we need to change all the code (js-ipfs, go-ipfs) to call this explicitly
+// - have it look for a config file? need to define what that is
 func SetupLogging() {
 
+	// colorful or plain
 	lfmt := LogFormats[os.Getenv(envLoggingFmt)]
 	if lfmt == "" {
 		lfmt = LogFormats[defaultLogFormat]
 	}
 
-	backend := logging.NewLogBackend(colorable.NewColorableStderr(), "", 0)
-	logging.SetBackend(backend)
+	// check if we log to a file, or syslog, building a list of log backends
+	var lgbe []logging.Backend
+	if logfp := os.Getenv(envLoggingFile); len(logfp) > 0 {
+		f, err := os.Create(logfp)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR go-log: %s: failed to set logging file backend\n", err)
+		} else {
+			lgbe = append(lgbe, logging.NewLogBackend(f, "", 0))
+		}
+	}
+
+	// check if we want a syslogger
+	if env := os.Getenv(envLoggingSyslog); env == "1" {
+		slbe, err := logging.NewSyslogBackend("")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR go-log: %s: failed to set logging syslog backend", err)
+		} else {
+			lgbe = append(lgbe, slbe)
+		}
+	}
+
+	// logs written to stderr
+	lgbe = append(lgbe, logging.NewLogBackend(colorable.NewColorableStderr(), "", 0))
+
+	// set the backend(s)
+	logging.SetBackend(lgbe...)
 	logging.SetFormatter(logging.MustStringFormatter(lfmt))
 
 	lvl := logging.ERROR
