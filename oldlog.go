@@ -36,8 +36,7 @@ const (
 	envLogging    = "IPFS_LOGGING"
 	envLoggingFmt = "IPFS_LOGGING_FMT"
 
-	envLoggingFile   = "GOLOG_FILE"          // /path/to/file
-	envLoggingSyslog = "GOLOG_SYSLOG_ENABLE" // 1 or 0
+	envLoggingFile = "GOLOG_FILE" // /path/to/file
 )
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
@@ -59,7 +58,7 @@ func SetupLogging() {
 		lfmt = LogFormats[defaultLogFormat]
 	}
 
-	// check if we log to a file, or syslog, building a list of log backends
+	// check if we log to a file
 	var lgbe []logging.Backend
 	if logfp := os.Getenv(envLoggingFile); len(logfp) > 0 {
 		f, err := os.Create(logfp)
@@ -67,16 +66,6 @@ func SetupLogging() {
 			fmt.Fprintf(os.Stderr, "ERROR go-log: %s: failed to set logging file backend\n", err)
 		} else {
 			lgbe = append(lgbe, logging.NewLogBackend(f, "", 0))
-		}
-	}
-
-	// check if we want a syslogger
-	if env := os.Getenv(envLoggingSyslog); env == "1" {
-		slbe, err := logging.NewSyslogBackend("")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR go-log: %s: failed to set logging syslog backend", err)
-		} else {
-			lgbe = append(lgbe, slbe)
 		}
 	}
 
