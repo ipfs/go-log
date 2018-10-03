@@ -228,10 +228,10 @@ func (el *eventLogger) SetTags(ctx context.Context, tags map[string]interface{})
 	}
 }
 
-func (el *eventLogger) SetErr(ctx context.Context, err error) {
+func (el *eventLogger) setErr(ctx context.Context, err error, skip int) {
 	span := opentrace.SpanFromContext(ctx)
 	if span == nil {
-		_, file, line, _ := runtime.Caller(1)
+		_, file, line, _ := runtime.Caller(skip)
 		log.Errorf("SetErr with no Span in context called on %s:%d", path.Base(file), line)
 		return
 	}
@@ -241,6 +241,10 @@ func (el *eventLogger) SetErr(ctx context.Context, err error) {
 
 	otExt.Error.Set(span, true)
 	span.LogKV("error", err.Error())
+}
+
+func (el *eventLogger) SetErr(ctx context.Context, err error) {
+	el.setErr(ctx, err, 1)
 }
 
 func (el *eventLogger) Finish(ctx context.Context) {
@@ -254,7 +258,7 @@ func (el *eventLogger) Finish(ctx context.Context) {
 }
 
 func (el *eventLogger) FinishWithErr(ctx context.Context, err error) {
-	el.SetErr(ctx, err)
+	el.setErr(ctx, err, 2)
 	el.Finish(ctx)
 }
 
