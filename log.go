@@ -339,7 +339,6 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 	var buf bytes.Buffer
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
 	err = encoder.Encode(accum)
 	if err != nil {
 		el.Errorf("ERROR FORMATTING EVENT ENTRY: %s", err)
