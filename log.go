@@ -3,7 +3,11 @@
 // https://godoc.org/github.com/whyrusleeping/go-logging .
 package log
 
-var log = Logger("eventlog")
+import (
+//"io"
+)
+
+var log = Logger("golog")
 
 // StandardLogger provides API compatibility with standard printf loggers
 // eg. go-logging
@@ -22,32 +26,31 @@ type StandardLogger interface {
 	Warningf(format string, args ...interface{})
 }
 
-// EventLogger extends the StandardLogger interface to allow for log items
-// containing structured metadata
-type EventLogger interface {
+type ExtendedLogger interface {
 	StandardLogger
+
+	WithField(key string, value interface{}) *Entry
+	WithFields(fileds Fields) *Entry
+	WithError(err error) *Entry
+
+	//SetOutput(out io.Writer)
+	//SetLevel(lvl Level)
+	//SetFormatter(lgmft Formatter)
 }
 
 // Logger retrieves an event logger by name
-func Logger(system string) EventLogger {
-
-	// TODO if we would like to adjust log levels at run-time. Store this event
-	// logger in a map (just like the util.Logger impl)
+func Logger(system string) ExtendedLogger {
 	if len(system) == 0 {
-		setuplog := getLogger("setup-logger")
-		setuplog.Warning("Missing name parameter")
-		system = "undefined"
+		panic("Missing logger name parameter")
 	}
 
-	logger := getLogger(system)
+	logger := getOrCreateLogger(system)
 
-	return &eventLogger{system: system, StandardLogger: logger}
+	return &goLogger{system: system, ExtendedLogger: logger}
 }
 
-// eventLogger implements the EventLogger and wraps a go-logging Logger
-type eventLogger struct {
-	StandardLogger
-
+// goLogger implements the ExtendedLogger interface
+type goLogger struct {
+	ExtendedLogger
 	system string
-	// TODO add log-level
 }
