@@ -183,12 +183,12 @@ type eventLogger struct {
 	// TODO add log-level
 }
 
-// Deprecated use Warn
+// Deprecated: use Warn
 func (el *eventLogger) Warning(args ...interface{}) {
 	el.Warn(args...)
 }
 
-// Deprecated use Warnf
+// Deprecated: use Warnf
 func (el *eventLogger) Warningf(format string, args ...interface{}) {
 	el.Warnf(format, args...)
 }
