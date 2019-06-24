@@ -82,8 +82,7 @@ func SetupLogging() {
 	*lvl = zapcore.ErrorLevel
 
 	if logenv := os.Getenv(envLogging); logenv != "" {
-		var err error
-		err = lvl.Set(logenv)
+		err := lvl.Set(logenv)
 		if err != nil {
 			fmt.Println("error setting log levels", err)
 		}
