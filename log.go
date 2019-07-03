@@ -32,7 +32,9 @@ type StandardLogger interface {
 	Infof(format string, args ...interface{})
 	Panic(args ...interface{})
 	Panicf(format string, args ...interface{})
+	// Deprecated use Warn
 	Warning(args ...interface{})
+	// Deprecated use Warnf
 	Warningf(format string, args ...interface{})
 }
 
@@ -40,6 +42,9 @@ type StandardLogger interface {
 // containing structured metadata
 type EventLogger interface {
 	StandardLogger
+
+	Warn(args ...interface{})
+	Warnf(format string, args ...interface{})
 
 	// Event merges structured data from the provided inputs into a single
 	// machine-readable log event.
@@ -176,6 +181,13 @@ type eventLogger struct {
 
 	system string
 	// TODO add log-level
+}
+
+func (el *eventLogger) Warn(args ...interface{}) {
+	el.Warning(args...)
+}
+func (el *eventLogger) Warnf(format string, args ...interface{}) {
+	el.Warningf(format, args...)
 }
 
 // Deprecated: Stop using go-log for event logging
