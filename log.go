@@ -160,7 +160,7 @@ type EventLogger interface {
 }
 
 // Logger retrieves an event logger by name
-func Logger(system string) EventLogger {
+func Logger(system string) *eventLogger {
 
 	// TODO if we would like to adjust log levels at run-time. Store this event
 	// logger in a map (just like the util.Logger impl)
