@@ -12,6 +12,7 @@ import (
 	"time"
 
 	writer "github.com/ipfs/go-log/writer"
+	"github.com/whyrusleeping/go-logging"
 
 	opentrace "github.com/opentracing/opentracing-go"
 	otExt "github.com/opentracing/opentracing-go/ext"
@@ -36,15 +37,14 @@ type StandardLogger interface {
 	Warning(args ...interface{})
 	// Deprecated use Warnf
 	Warningf(format string, args ...interface{})
+	Warn(args ...interface{})
+	Warnf(format string, args ...interface{})
 }
 
 // EventLogger extends the StandardLogger interface to allow for log items
 // containing structured metadata
 type EventLogger interface {
 	StandardLogger
-
-	Warn(args ...interface{})
-	Warnf(format string, args ...interface{})
 
 	// Event merges structured data from the provided inputs into a single
 	// machine-readable log event.
@@ -172,12 +172,12 @@ func Logger(system string) EventLogger {
 
 	logger := getLogger(system)
 
-	return &eventLogger{system: system, StandardLogger: logger}
+	return &eventLogger{system: system, Logger: *logger}
 }
 
 // eventLogger implements the EventLogger and wraps a go-logging Logger
 type eventLogger struct {
-	StandardLogger
+	logging.Logger
 
 	system string
 	// TODO add log-level
