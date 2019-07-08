@@ -59,16 +59,18 @@ var zapCfg = zap.NewProductionConfig()
 func SetupLogging() {
 
 	// colorful or plain
-
-	color := os.Getenv(envLoggingFmt) != "nocolor"
-	if color {
-		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	} else {
+	switch os.Getenv(envLoggingFmt) {
+	case "nocolor":
+		zapCfg.Encoding = "console"
 		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	case "json":
+		zapCfg.Encoding = "json"
+	default:
+		zapCfg.Encoding = "console"
+		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	}
 
 	zapCfg.Sampling = nil
-	zapCfg.Encoding = "console"
 	zapCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
 	zapCfg.OutputPaths = []string{"stderr"}

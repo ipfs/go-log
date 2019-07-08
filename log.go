@@ -161,12 +161,9 @@ type EventLogger interface {
 
 // Logger retrieves an event logger by name
 func Logger(system string) *eventLogger {
-
-	// TODO if we would like to adjust log levels at run-time. Store this event
-	// logger in a map (just like the util.Logger impl)
 	if len(system) == 0 {
 		setuplog := getLogger("setup-logger")
-		setuplog.Warn("Missing name parameter")
+		setuplog.Error("Missing name parameter")
 		system = "undefined"
 	}
 
