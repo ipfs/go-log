@@ -9,9 +9,10 @@ import (
 	tracer "github.com/ipfs/go-log/tracer"
 	lwriter "github.com/ipfs/go-log/writer"
 
-	colorable "github.com/mattn/go-colorable"
 	opentrace "github.com/opentracing/opentracing-go"
-	logging "github.com/whyrusleeping/go-logging"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func init() {
@@ -46,47 +47,48 @@ var ErrNoSuchLogger = errors.New("Error: No such logger")
 
 // loggers is the set of loggers in the system
 var loggerMutex sync.RWMutex
-var loggers = map[string]*logging.Logger{}
+var loggers = make(map[string]*zap.SugaredLogger)
+var levels = make(map[string]zap.AtomicLevel)
 
 // SetupLogging will initialize the logger backend and set the flags.
 // TODO calling this in `init` pushes all configuration to env variables
 // - move it out of `init`? then we need to change all the code (js-ipfs, go-ipfs) to call this explicitly
 // - have it look for a config file? need to define what that is
+var zapCfg = zap.NewProductionConfig()
+
 func SetupLogging() {
 
 	// colorful or plain
-	lfmt := LogFormats[os.Getenv(envLoggingFmt)]
-	if lfmt == "" {
-		lfmt = LogFormats[defaultLogFormat]
+
+	color := os.Getenv(envLoggingFmt) != "nocolor"
+	if color {
+		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	} else {
+		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	}
 
+	zapCfg.Sampling = nil
+	zapCfg.Encoding = "console"
+	zapCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	zapCfg.OutputPaths = []string{"stderr"}
 	// check if we log to a file
-	var lgbe []logging.Backend
 	if logfp := os.Getenv(envLoggingFile); len(logfp) > 0 {
-		f, err := os.Create(logfp)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR go-log: %s: failed to set logging file backend\n", err)
-		} else {
-			lgbe = append(lgbe, logging.NewLogBackend(f, "", 0))
-		}
+		zapCfg.OutputPaths = append(zapCfg.OutputPaths, logfp)
 	}
-
-	// logs written to stderr
-	lgbe = append(lgbe, logging.NewLogBackend(colorable.NewColorableStderr(), "", 0))
 
 	// set the backend(s)
-	logging.SetBackend(lgbe...)
-	logging.SetFormatter(logging.MustStringFormatter(lfmt))
-
-	lvl := logging.ERROR
+	lvl := new(zapcore.Level)
+	*lvl = zapcore.ErrorLevel
 
 	if logenv := os.Getenv(envLogging); logenv != "" {
 		var err error
-		lvl, err = logging.LogLevel(logenv)
+		err = lvl.Set(logenv)
 		if err != nil {
 			fmt.Println("error setting log levels", err)
 		}
 	}
+	zapCfg.Level.SetLevel(*lvl)
 
 	// TracerPlugins are instantiated after this, so use loggable tracer
 	// by default, if a TracerPlugin is added it will override this
@@ -94,7 +96,7 @@ func SetupLogging() {
 	lgblTracer := tracer.New(lgblRecorder)
 	opentrace.SetGlobalTracer(lgblTracer)
 
-	SetAllLoggers(lvl)
+	SetAllLoggers(*lvl)
 
 	if tracingfp := os.Getenv(envTracingFile); len(tracingfp) > 0 {
 		f, err := os.Create(tracingfp)
@@ -108,32 +110,31 @@ func SetupLogging() {
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
 func SetDebugLogging() {
-	SetAllLoggers(logging.DEBUG)
+	SetAllLoggers(zapcore.DebugLevel)
 }
 
 // SetAllLoggers changes the logging.Level of all loggers to lvl
-func SetAllLoggers(lvl logging.Level) {
-	logging.SetLevel(lvl, "")
-
+func SetAllLoggers(lvl zapcore.Level) {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
 
-	for n := range loggers {
-		logging.SetLevel(lvl, n)
+	for _, l := range levels {
+		l.SetLevel(lvl)
 	}
 }
 
 // SetLogLevel changes the log level of a specific subsystem
 // name=="*" changes all subsystems
 func SetLogLevel(name, level string) error {
-	lvl, err := logging.LogLevel(level)
+	lvl := new(zapcore.Level)
+	err := lvl.Set(level)
 	if err != nil {
 		return err
 	}
 
 	// wildcard, change all
 	if name == "*" {
-		SetAllLoggers(lvl)
+		SetAllLoggers(*lvl)
 		return nil
 	}
 
@@ -141,11 +142,11 @@ func SetLogLevel(name, level string) error {
 	defer loggerMutex.RUnlock()
 
 	// Check if we have a logger by that name
-	if _, ok := loggers[name]; !ok {
+	if _, ok := levels[name]; !ok {
 		return ErrNoSuchLogger
 	}
 
-	logging.SetLevel(lvl, name)
+	levels[name].SetLevel(*lvl)
 
 	return nil
 }
@@ -163,13 +164,19 @@ func GetSubsystems() []string {
 	return subs
 }
 
-func getLogger(name string) *logging.Logger {
+func getLogger(name string) *zap.SugaredLogger {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
-
-	log := loggers[name]
-	if log == nil {
-		log = logging.MustGetLogger(name)
+	log, ok := loggers[name]
+	if !ok {
+		levels[name] = zap.NewAtomicLevelAt(zapCfg.Level.Level())
+		cfg := zap.Config(zapCfg)
+		cfg.Level = levels[name]
+		newlog, err := cfg.Build()
+		if err != nil {
+			panic(err)
+		}
+		log = newlog.Named(name).Sugar()
 		loggers[name] = log
 	}
 

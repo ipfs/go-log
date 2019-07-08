@@ -12,10 +12,10 @@ import (
 	"time"
 
 	writer "github.com/ipfs/go-log/writer"
-	"github.com/whyrusleeping/go-logging"
 
 	opentrace "github.com/opentracing/opentracing-go"
 	otExt "github.com/opentracing/opentracing-go/ext"
+	"go.uber.org/zap"
 )
 
 var log = Logger("eventlog")
@@ -166,28 +166,31 @@ func Logger(system string) EventLogger {
 	// logger in a map (just like the util.Logger impl)
 	if len(system) == 0 {
 		setuplog := getLogger("setup-logger")
-		setuplog.Warning("Missing name parameter")
+		setuplog.Warn("Missing name parameter")
 		system = "undefined"
 	}
 
 	logger := getLogger(system)
 
-	return &eventLogger{system: system, Logger: *logger}
+	return &eventLogger{system: system, SugaredLogger: *logger}
 }
 
 // eventLogger implements the EventLogger and wraps a go-logging Logger
 type eventLogger struct {
-	logging.Logger
+	zap.SugaredLogger
 
 	system string
 	// TODO add log-level
 }
 
-func (el *eventLogger) Warn(args ...interface{}) {
-	el.Warning(args...)
+// Deprecated use Warn
+func (el *eventLogger) Warning(args ...interface{}) {
+	el.Warn(args...)
 }
-func (el *eventLogger) Warnf(format string, args ...interface{}) {
-	el.Warningf(format, args...)
+
+// Deprecated use Warnf
+func (el *eventLogger) Warningf(format string, args ...interface{}) {
+	el.Warnf(format, args...)
 }
 
 // Deprecated: Stop using go-log for event logging
