@@ -80,16 +80,16 @@ func SetupLogging() {
 	}
 
 	// set the backend(s)
-	lvl := new(zapcore.Level)
-	*lvl = zapcore.ErrorLevel
+	lvl := zapcore.ErrorLevel
 
 	if logenv := os.Getenv(envLogging); logenv != "" {
-		err := lvl.Set(logenv)
+		var err error
+		lvl, err = stringToZap(logenv)
 		if err != nil {
 			fmt.Println("error setting log levels", err)
 		}
 	}
-	zapCfg.Level.SetLevel(*lvl)
+	zapCfg.Level.SetLevel(lvl)
 
 	// TracerPlugins are instantiated after this, so use loggable tracer
 	// by default, if a TracerPlugin is added it will override this
@@ -97,7 +97,7 @@ func SetupLogging() {
 	lgblTracer := tracer.New(lgblRecorder)
 	opentrace.SetGlobalTracer(lgblTracer)
 
-	SetAllLoggers(*lvl)
+	setAllZap(lvl)
 
 	if tracingfp := os.Getenv(envTracingFile); len(tracingfp) > 0 {
 		f, err := os.Create(tracingfp)
@@ -111,31 +111,38 @@ func SetupLogging() {
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
 func SetDebugLogging() {
-	SetAllLoggers(zapcore.DebugLevel)
+	setAllZap(zapcore.DebugLevel)
 }
 
 // SetAllLoggers changes the logging.Level of all loggers to lvl
-func SetAllLoggers(lvl zapcore.Level) {
+func SetAllLoggers(level string) {
+	lvl, err := stringToZap(level)
+	if err != nil {
+		fmt.Printf("Error: could not set all logers to '%s': %+v\n", level, err)
+	}
+	setAllZap(lvl)
+}
+
+func setAllZap(level zapcore.Level) {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
 
 	for _, l := range levels {
-		l.SetLevel(lvl)
+		l.SetLevel(level)
 	}
 }
 
 // SetLogLevel changes the log level of a specific subsystem
 // name=="*" changes all subsystems
 func SetLogLevel(name, level string) error {
-	lvl := new(zapcore.Level)
-	err := lvl.Set(level)
+	lvl, err := stringToZap(level)
 	if err != nil {
 		return err
 	}
 
 	// wildcard, change all
 	if name == "*" {
-		SetAllLoggers(*lvl)
+		setAllZap(lvl)
 		return nil
 	}
 
@@ -147,7 +154,7 @@ func SetLogLevel(name, level string) error {
 		return ErrNoSuchLogger
 	}
 
-	levels[name].SetLevel(*lvl)
+	levels[name].SetLevel(lvl)
 
 	return nil
 }
