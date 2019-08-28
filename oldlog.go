@@ -118,7 +118,8 @@ func SetDebugLogging() {
 func SetAllLoggers(level string) {
 	lvl, err := stringToZap(level)
 	if err != nil {
-		fmt.Printf("Error: could not set all logers to '%s': %+v\n", level, err)
+		fmt.Printf("Error: could not set all loggers to '%s': %+v\n", level, err)
+		return
 	}
 	setAllZap(lvl)
 }
