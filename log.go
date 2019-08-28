@@ -331,10 +331,6 @@ func (el *ZapEventLogger) EventBegin(ctx context.Context, event string, metadata
 	return eip
 }
 
-type activeEventKeyType struct{}
-
-var activeEventKey = activeEventKeyType{}
-
 // Deprecated: Stop using go-log for event logging
 func (el *ZapEventLogger) Event(ctx context.Context, event string, metadata ...Loggable) {
 
