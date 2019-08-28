@@ -68,16 +68,16 @@ func SetupLogging() {
 	}
 
 	// set the backend(s)
-	lvl := zapcore.ErrorLevel
+	lvl := LevelError
 
 	if logenv := os.Getenv(envLogging); logenv != "" {
 		var err error
-		lvl, err = stringToZap(logenv)
+		lvl, err = LevelFromString(logenv)
 		if err != nil {
 			fmt.Println("error setting log levels", err)
 		}
 	}
-	zapCfg.Level.SetLevel(lvl)
+	zapCfg.Level.SetLevel(zapcore.Level(lvl))
 
 	// TracerPlugins are instantiated after this, so use loggable tracer
 	// by default, if a TracerPlugin is added it will override this
@@ -85,7 +85,7 @@ func SetupLogging() {
 	lgblTracer := tracer.New(lgblRecorder)
 	opentrace.SetGlobalTracer(lgblTracer)
 
-	setAllZap(lvl)
+	SetAllLoggers(lvl)
 
 	if tracingfp := os.Getenv(envTracingFile); len(tracingfp) > 0 {
 		f, err := os.Create(tracingfp)
@@ -99,39 +99,30 @@ func SetupLogging() {
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
 func SetDebugLogging() {
-	setAllZap(zapcore.DebugLevel)
+	SetAllLoggers(LevelDebug)
 }
 
-// SetAllLoggers changes the logging.Level of all loggers to lvl
-func SetAllLoggers(level string) {
-	lvl, err := stringToZap(level)
-	if err != nil {
-		fmt.Printf("Error: could not set all loggers to '%s': %+v\n", level, err)
-		return
-	}
-	setAllZap(lvl)
-}
-
-func setAllZap(level zapcore.Level) {
+// SetAllLoggers changes the logging level of all loggers to lvl
+func SetAllLoggers(lvl LogLevel) {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
 
 	for _, l := range levels {
-		l.SetLevel(level)
+		l.SetLevel(zapcore.Level(lvl))
 	}
 }
 
 // SetLogLevel changes the log level of a specific subsystem
 // name=="*" changes all subsystems
 func SetLogLevel(name, level string) error {
-	lvl, err := stringToZap(level)
+	lvl, err := LevelFromString(level)
 	if err != nil {
 		return err
 	}
 
 	// wildcard, change all
 	if name == "*" {
-		setAllZap(lvl)
+		SetAllLoggers(lvl)
 		return nil
 	}
 
@@ -143,7 +134,7 @@ func SetLogLevel(name, level string) error {
 		return ErrNoSuchLogger
 	}
 
-	levels[name].SetLevel(lvl)
+	levels[name].SetLevel(zapcore.Level(lvl))
 
 	return nil
 }
