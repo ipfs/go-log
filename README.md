@@ -12,7 +12,8 @@
 
 > The logging library used by go-ipfs
 
-It currently uses a modified version of [go-logging](https://github.com/whyrusleeping/go-logging) to implement the standard printf-style log output.
+go-log wraps [zap](https://github.com/uber-go/zap) to provide a logging facade. go-log manages logging
+instances and allows for their levels to be controlled individually.
 
 ## Install
 
@@ -28,41 +29,27 @@ Once the package is imported under the name `logging`, an instance of `EventLogg
 var log = logging.Logger("subsystem name")
 ```
 
-It can then be used to emit log messages, either plain printf-style messages at six standard levels or structured messages using `Start`, `StartFromParentState`, `Finish` and `FinishWithErr` methods.
+It can then be used to emit log messages in plain printf-style messages at seven standard levels:
 
-## Example
+Levels may be set for all loggers:
 
 ```go
-func (s *Session) GetBlock(ctx context.Context, c *cid.Cid) (blk blocks.Block, err error) {
-
-    // Starts Span called "Session.GetBlock", associates with `ctx`
-    ctx = log.Start(ctx, "Session.GetBlock")
-
-    // defer so `blk` and `err` can be evaluated after call
-    defer func() {
-        // tag span associated with `ctx`
-        log.SetTags(ctx, map[string]interface{}{
-            "cid": c,
-            "block", blk,
-        })
-        // if err is non-nil tag the span with an error
-        log.FinishWithErr(ctx, err)
-    }()
-
-    if shouldStartSomething() {
-        // log message on span associated with `ctx`
-        log.LogKV(ctx, "startSomething", true)
-    }
-  ...
-}
+lvl, err := logging.LevelFromString("error")
+  if err != nil {
+    panic(err)
+  }
+logging.SetAllLoggers(lvl)
 ```
-## Tracing
 
-`go-log` wraps the [opentracing-go](https://github.com/opentracing/opentracing-go) methods - `StartSpan`, `Finish`, `LogKV`, and `SetTag`.
+or individually:
 
-`go-log` implements its own tracer - `loggabletracer` - based on the [basictracer-go](https://github.com/opentracing/basictracer-go) implementation. If there is an active [`WriterGroup`](https://github.com/ipfs/go-log/blob/master/writer/option.go) the `loggabletracer` will [record](https://github.com/ipfs/go-log/blob/master/tracer/recorder.go) span data to the `WriterGroup`. An example of this can be seen in the [`log tail`](https://github.com/ipfs/go-ipfs/blob/master/core/commands/log.go) command of `go-ipfs`. 
-
-Third party tracers may be used by calling `opentracing.SetGlobalTracer()` with your desired tracing implementation. An example of this can be seen using the [`go-jaeger-plugin`](https://github.com/ipfs/go-jaeger-plugin) and the `go-ipfs` [tracer plugin](https://github.com/ipfs/go-ipfs/blob/master/plugin/tracer.go)
+```go
+lvl, err := logging.LevelFromString("error")
+  if err != nil {
+    panic(err)
+  }
+logging.SetLogLevel("foo", "info")
+```
 
 ## Contribute
 

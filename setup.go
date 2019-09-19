@@ -7,11 +7,6 @@ import (
 	"regexp"
 	"sync"
 
-	tracer "github.com/ipfs/go-log/tracer"
-	lwriter "github.com/ipfs/go-log/writer"
-
-	opentrace "github.com/opentracing/opentracing-go"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -94,22 +89,7 @@ func SetupLogging() {
 	}
 	zapCfg.Level.SetLevel(zapcore.Level(lvl))
 
-	// TracerPlugins are instantiated after this, so use loggable tracer
-	// by default, if a TracerPlugin is added it will override this
-	lgblRecorder := tracer.NewLoggableRecorder()
-	lgblTracer := tracer.New(lgblRecorder)
-	opentrace.SetGlobalTracer(lgblTracer)
-
 	SetAllLoggers(lvl)
-
-	if tracingfp := os.Getenv(envTracingFile); len(tracingfp) > 0 {
-		f, err := os.Create(tracingfp)
-		if err != nil {
-			log.Error("failed to create tracing file: %s", tracingfp)
-		} else {
-			lwriter.WriterGroup.AddWriter(f)
-		}
-	}
 }
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
