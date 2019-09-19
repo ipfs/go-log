@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"sync"
 
 	tracer "github.com/ipfs/go-log/tracer"
@@ -21,10 +22,8 @@ func init() {
 
 // Logging environment variables
 const (
-	// TODO these env names should be more general, IPFS is not the only project to
-	// use go-log
-	envLogging    = "IPFS_LOGGING"
-	envLoggingFmt = "IPFS_LOGGING_FMT"
+	envLogging    = "GOLOG_LOG_LEVEL"
+	envLoggingFmt = "GOLOG_LOG_FMT"
 
 	envLoggingFile = "GOLOG_FILE"         // /path/to/file
 	envTracingFile = "GOLOG_TRACING_FILE" // /path/to/file
@@ -136,6 +135,29 @@ func SetLogLevel(name, level string) error {
 
 	levels[name].SetLevel(zapcore.Level(lvl))
 
+	return nil
+}
+
+// SetLogLevelRegex sets all loggers to level `l` that match expression `e`.
+// An error is returned if `e` fails to compile.
+func SetLogLevelRegex(e, l string) error {
+	lvl, err := LevelFromString(l)
+	if err != nil {
+		return err
+	}
+
+	rem, err := regexp.Compile(e)
+	if err != nil {
+		return err
+	}
+
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+	for name := range loggers {
+		if rem.MatchString(name) {
+			levels[name].SetLevel(zapcore.Level(lvl))
+		}
+	}
 	return nil
 }
 
