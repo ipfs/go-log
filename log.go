@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"time"
 
+	log2 "github.com/ipfs/go-log/v2"
 	writer "github.com/ipfs/go-log/writer"
 
 	opentrace "github.com/opentracing/opentracing-go"
@@ -164,14 +165,12 @@ var _ EventLogger = Logger("test-logger")
 // Logger retrieves an event logger by name
 func Logger(system string) *ZapEventLogger {
 	if len(system) == 0 {
-		setuplog := getLogger("setup-logger")
+		setuplog := Logger("setup-logger")
 		setuplog.Error("Missing name parameter")
 		system = "undefined"
 	}
-
-	logger := getLogger(system)
-
-	return &ZapEventLogger{system: system, SugaredLogger: *logger}
+	logger := log2.Logger(system)
+	return &ZapEventLogger{system: system, SugaredLogger: logger.SugaredLogger}
 }
 
 // ZapEventLogger implements the EventLogger and wraps a go-logging Logger

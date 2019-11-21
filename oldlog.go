@@ -12,6 +12,8 @@ import (
 
 	opentrace "github.com/opentracing/opentracing-go"
 
+	log2 "github.com/ipfs/go-log/v2"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -119,12 +121,8 @@ func SetDebugLogging() {
 
 // SetAllLoggers changes the logging level of all loggers to lvl
 func SetAllLoggers(lvl LogLevel) {
-	loggerMutex.RLock()
-	defer loggerMutex.RUnlock()
-
-	for _, l := range levels {
-		l.SetLevel(zapcore.Level(lvl))
-	}
+	lvl2 := log2.LogLevel(lvl)
+	log2.SetAllLoggers(lvl2)
 }
 
 // SetLogLevel changes the log level of a specific subsystem
