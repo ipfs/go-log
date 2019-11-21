@@ -1,4 +1,4 @@
-module github.com/ipfs/go-log
+module github.com/ipfs/go-log/v2
 
 require (
 	github.com/gogo/protobuf v1.2.1
