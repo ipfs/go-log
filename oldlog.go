@@ -22,6 +22,14 @@ func init() {
 
 // Logging environment variables
 const (
+	// IPFS_* prefixed env vars kept for backwards compatibility
+	// for this release. They will not be available in the next
+	// release.
+	//
+	// GOLOG_* env vars take precedences over IPFS_* env vars.
+	envIPFSLogging    = "IPFS_LOGGING"
+	envIPFSLoggingFmt = "IPFS_LOGGING_FMT"
+
 	envLogging    = "GOLOG_LOG_LEVEL"
 	envLoggingFmt = "GOLOG_LOG_FMT"
 
@@ -44,9 +52,12 @@ var levels = make(map[string]zap.AtomicLevel)
 var zapCfg = zap.NewProductionConfig()
 
 func SetupLogging() {
-
+	loggingFmt := os.Getenv(envLoggingFmt)
+	if loggingFmt == "" {
+		loggingFmt = os.Getenv(envIPFSLoggingFmt)
+	}
 	// colorful or plain
-	switch os.Getenv(envLoggingFmt) {
+	switch loggingFmt {
 	case "nocolor":
 		zapCfg.Encoding = "console"
 		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
@@ -69,7 +80,12 @@ func SetupLogging() {
 	// set the backend(s)
 	lvl := LevelError
 
-	if logenv := os.Getenv(envLogging); logenv != "" {
+	logenv := os.Getenv(envLogging)
+	if logenv == "" {
+		logenv = os.Getenv(envIPFSLogging)
+	}
+
+	if logenv != "" {
 		var err error
 		lvl, err = LevelFromString(logenv)
 		if err != nil {
