@@ -24,7 +24,6 @@ type StandardLogger interface {
 	Infof(format string, args ...interface{})
 	Panic(args ...interface{})
 	Panicf(format string, args ...interface{})
-	Warningf(format string, args ...interface{})
 	Warn(args ...interface{})
 	Warnf(format string, args ...interface{})
 }
