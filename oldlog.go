@@ -1,14 +1,10 @@
 package log
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"regexp"
-	"sync"
-
 	tracer "github.com/ipfs/go-log/tracer"
 	lwriter "github.com/ipfs/go-log/writer"
+	"os"
 
 	opentrace "github.com/opentracing/opentracing-go"
 
@@ -38,14 +34,6 @@ const (
 	envLoggingFile = "GOLOG_FILE"         // /path/to/file
 	envTracingFile = "GOLOG_TRACING_FILE" // /path/to/file
 )
-
-// ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
-var ErrNoSuchLogger = errors.New("Error: No such logger")
-
-// loggers is the set of loggers in the system
-var loggerMutex sync.RWMutex
-var loggers = make(map[string]*zap.SugaredLogger)
-var levels = make(map[string]zap.AtomicLevel)
 
 // SetupLogging will initialize the logger backend and set the flags.
 // TODO calling this in `init` pushes all configuration to env variables
@@ -128,81 +116,17 @@ func SetAllLoggers(lvl LogLevel) {
 // SetLogLevel changes the log level of a specific subsystem
 // name=="*" changes all subsystems
 func SetLogLevel(name, level string) error {
-	lvl, err := LevelFromString(level)
-	if err != nil {
-		return err
-	}
-
-	// wildcard, change all
-	if name == "*" {
-		SetAllLoggers(lvl)
-		return nil
-	}
-
-	loggerMutex.RLock()
-	defer loggerMutex.RUnlock()
-
-	// Check if we have a logger by that name
-	if _, ok := levels[name]; !ok {
-		return ErrNoSuchLogger
-	}
-
-	levels[name].SetLevel(zapcore.Level(lvl))
-
-	return nil
+	return log2.SetLogLevel(name, level)
 }
 
 // SetLogLevelRegex sets all loggers to level `l` that match expression `e`.
 // An error is returned if `e` fails to compile.
 func SetLogLevelRegex(e, l string) error {
-	lvl, err := LevelFromString(l)
-	if err != nil {
-		return err
-	}
-
-	rem, err := regexp.Compile(e)
-	if err != nil {
-		return err
-	}
-
-	loggerMutex.Lock()
-	defer loggerMutex.Unlock()
-	for name := range loggers {
-		if rem.MatchString(name) {
-			levels[name].SetLevel(zapcore.Level(lvl))
-		}
-	}
-	return nil
+	return log2.SetLogLevelRegex(e, l)
 }
 
 // GetSubsystems returns a slice containing the
 // names of the current loggers
 func GetSubsystems() []string {
-	loggerMutex.RLock()
-	defer loggerMutex.RUnlock()
-	subs := make([]string, 0, len(loggers))
-
-	for k := range loggers {
-		subs = append(subs, k)
-	}
-	return subs
-}
-
-func getLogger(name string) *zap.SugaredLogger {
-	loggerMutex.Lock()
-	defer loggerMutex.Unlock()
-	log, ok := loggers[name]
-	if !ok {
-		levels[name] = zap.NewAtomicLevelAt(zapCfg.Level.Level())
-		cfg := zap.Config(zapCfg)
-		cfg.Level = levels[name]
-		newlog, err := cfg.Build()
-		if err != nil {
-			panic(err)
-		}
-		log = newlog.Named(name).Sugar()
-		loggers[name] = log
-	}
-
-	return log
+	return log2.GetSubsystems()
 }
