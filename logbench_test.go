@@ -12,7 +12,19 @@ import (
 
 func BenchmarkSimpleInfo(b *testing.B) {
 	l := Logger("bench")
-	SetLogLevel("bench", "info")
+	_ = SetLogLevel("bench", "info")
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		l.Info("test")
+	}
+}
+
+func BenchmarkSimpleInfoWithFields(b *testing.B) {
+	SetFieldsOnAllLoggers("hostname", "host-1", "ip", "192.168.1.1", "name", "go-log")
+	l := Logger("bench")
+	_ = SetLogLevel("bench", "info")
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -25,18 +37,18 @@ var logString = "String, IDK what to write, let's punch a keyboard. jkdlsjklfdjf
 
 func BenchmarkFormatInfo(b *testing.B) {
 	l := Logger("bench")
-	SetLogLevel("bench", "info")
+	_ = SetLogLevel("bench", "info")
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		l.Infof("test %d %s", logString)
+		l.Infof("test %d %s", 5, logString)
 	}
 }
 
 func BenchmarkFormatInfoMulti(b *testing.B) {
 	l := Logger("bench")
-	SetLogLevel("bench", "info")
+	_ = SetLogLevel("bench", "info")
 	var wg sync.WaitGroup
 
 	goroutines := 16

@@ -9,8 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var log = Logger("eventlog")
-
 // StandardLogger provides API compatibility with standard printf loggers
 // eg. go-logging
 type StandardLogger interface {
@@ -47,10 +45,19 @@ func Logger(system string) *ZapEventLogger {
 	return &ZapEventLogger{system: system, SugaredLogger: *logger}
 }
 
-// ZapEventLogger implements the EventLogger and wraps a go-logging Logger
+// ZapEventLogger implements the EventLogger and wraps a zap Sugared Logger.
 type ZapEventLogger struct {
 	zap.SugaredLogger
 	system string
+}
+
+// SetFieldsOnLogger adds the provided key value args as fields to
+// the embedded zap.SugaredLogger. These fields are separate to those
+// that are provided to the logger via SetFieldsOnAllLoggers and these
+// only last for the life time of this particular ZapEventLogger instance.
+// Note: the fields will be passed to any children loggers of this logger.
+func (zel *ZapEventLogger) SetFieldsOnLogger(name string, args ...interface{}) {
+	zel.SugaredLogger = *zel.With(args...)
 }
 
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
