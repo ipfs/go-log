@@ -58,7 +58,7 @@ func SetupLogging() {
 	if ok {
 		jsonCfg, err = ioutil.ReadFile(jsonCfgFile)
 		if err != nil {
-			fmt.Println(fmt.Errorf("failed to read json config file: %w", err))
+			fmt.Println(fmt.Errorf("failed to read json config file: %v", err))
 			fmt.Printf("initializing go-log with default configuration")
 		}
 		setupLogging(jsonCfg)
