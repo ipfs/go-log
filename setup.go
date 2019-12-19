@@ -31,9 +31,6 @@ const (
 	envLoggingFmt  = "GOLOG_LOG_FMT"
 	envLoggingCfg  = "GOLOG_LOG_CONFIG" // /path/to/file
 	envLoggingFile = "GOLOG_FILE"       // /path/to/file
-
-	// envTracingFile is deprecated.
-	envTracingFile = "GOLOG_TRACING_FILE" //nolint: unused
 )
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
@@ -41,12 +38,9 @@ var ErrNoSuchLogger = errors.New("Error: No such logger")
 
 // loggers is the set of loggers in the system
 var loggerMutex sync.RWMutex
-var loggers = make(map[string]*zap.SugaredLogger)
+var loggers = make(map[string]*ZapEventLogger)
 var levels = make(map[string]zap.AtomicLevel)
-
-// fields contains key/value pairs that will be added to all
-// loggers.
-var fields = make([]interface{}, 0)
+var fields = make(map[string]interface{})
 
 var zapCfg = zap.NewProductionConfig()
 
@@ -124,19 +118,40 @@ func setupLogging(jsonCfg []byte) {
 	}
 }
 
-// SetFieldOnAllLoggers adds the provided key value args as fields to
+var setFieldsOnce sync.Once
+
+// SetFieldsOnAllLoggers adds the provided key value args as fields to
 // all loggers.
-// Must be called before Logger, i.e. in an init() function.
+// SetFieldsOnAllLoggers can only be called ONCE, and it should be by the main
+// application and not by any libraries.
+// Should be called in an init() function, i.e. before any libraries start logging.
 // SetFieldOnAllLoggers will panic if the length of args is not even.
 func SetFieldsOnAllLoggers(args ...interface{}) {
-	if len(args)%2 != 0 {
-		panic(fmt.Errorf("SetFieldOnAllLoggers: length of args must be an even number as it represents key/value pairs: len %d", len(args)))
-	}
+	setFieldsOnce.Do(func() {
+		if len(args)%2 != 0 {
+			panic(fmt.Errorf("SetFieldOnAllLoggers: length of args must be an even number: len %d", len(args)))
+		}
 
-	loggerMutex.Lock()
-	defer loggerMutex.Unlock()
+		loggerMutex.Lock()
+		defer loggerMutex.Unlock()
 
-	fields = append(fields, args...)
+		// deduplicate field names in case SetFieldOnAllLoggers
+		// is called more than once
+		for i := 0; i <= len(args)/2; i += 2 {
+			fields[args[i].(string)] = args[i+1]
+		}
+		var fs []interface{}
+
+		// flatten map to array
+		for n, v := range fields {
+			fs = append(fs, n, v)
+		}
+
+		for name, l := range loggers {
+			loggers[name].SugaredLogger = l.With(fs...)
+		}
+
+	})
 }
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
@@ -217,30 +232,33 @@ func GetSubsystems() []string {
 	return subs
 }
 
-func getLogger(name string) *zap.SugaredLogger {
+func getLogger(name string) *ZapEventLogger {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
-	log, ok := loggers[name]
-	if !ok {
-		levels[name] = zap.NewAtomicLevelAt(zapCfg.Level.Level())
-		zapCfg.Level = levels[name]
-		newlog, err := zapCfg.Build()
-		if err != nil {
-			panic(err)
-		}
-		log = newlog.Named(name).Sugar().With(fields...)
-		loggers[name] = log
+	if l, ok := loggers[name]; ok {
+		return l
 	}
 
-	return log
+	levels[name] = zap.NewAtomicLevelAt(zapCfg.Level.Level())
+	zapCfg.Level = levels[name]
+	newlog, err := zapCfg.Build()
+	if err != nil {
+		panic(err)
+	}
+	log := newlog.Named(name).Sugar()
+
+	l := &ZapEventLogger{system: name, SugaredLogger: log}
+	loggers[name] = l
+
+	return l
 }
 
-// Cleanup is for testing purposes only.
-// Cleanup resets the package state.
-func Cleanup() {
+// cleanup is for testing purposes only.
+// cleanup resets the package state.
+func cleanup() {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
-	loggers = make(map[string]*zap.SugaredLogger)
+	loggers = make(map[string]*ZapEventLogger)
 	levels = make(map[string]zap.AtomicLevel)
-	fields = make([]interface{}, 0)
+	fields = make(map[string]interface{})
 }

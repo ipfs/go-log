@@ -1,18 +1,16 @@
-package log_test
+package log
 
 import (
 	"os"
-
-	logging "github.com/ipfs/go-log/v2"
 )
 
 func ExampleLogger() {
-	logging.Cleanup()
+	cleanup()
 	os.Setenv("GOLOG_LOG_CONFIG", "example_config.json")
-	logging.SetupLogging()
-	defer logging.Cleanup()
+	SetupLogging()
+	defer cleanup()
 
-	log := logging.Logger("parent")
+	log := Logger("parent")
 	log.Info("test log from parent")
 
 	// Output:
@@ -20,14 +18,14 @@ func ExampleLogger() {
 }
 
 func ExampleZapEventLogger_SetFieldsOnLogger() {
-	logging.Cleanup()
+	cleanup()
 	os.Setenv("GOLOG_LOG_CONFIG", "example_config.json")
-	logging.SetupLogging()
-	defer logging.Cleanup()
+	SetupLogging()
+	defer cleanup()
 
-	log := logging.Logger("parent")
+	log := Logger("parent")
 	log.Info("test log from parent without hostname")
-	log.SetFieldsOnLogger("parent", "hostname", "host-1")
+	log.SetFieldsOnLogger("hostname", "host-1")
 	log.Info("test log from parent")
 
 	childlog := log.Named("child")
@@ -39,18 +37,21 @@ func ExampleZapEventLogger_SetFieldsOnLogger() {
 }
 
 func ExampleSetFieldsOnAllLoggers() {
-	logging.Cleanup()
+	cleanup()
 	os.Setenv("GOLOG_LOG_CONFIG", "example_config.json")
-	logging.SetupLogging()
-	defer logging.Cleanup()
+	SetupLogging()
+	defer cleanup()
 
-	logging.SetFieldsOnAllLoggers("hostname", "host-1")
+	log1 := Logger("sys1")
+	log2 := Logger("sys2")
 
-	log := logging.Logger("parent")
-	log.Info("test log from parent")
-	childlog := log.Named("child")
-	childlog.Info("test log from child")
+	SetFieldsOnAllLoggers("hostname", "host-1", "other", "fields")
+	// Any further calls to SetFieldsOnAllLoggers will be ignored
+	SetFieldsOnAllLoggers("ignored", "true")
+
+	log1.Info("test log from sys1")
+	log2.Info("test log from sys2")
 	// Output:
-	// {"level":"info","logger":"parent","message":"test log from parent","hostname":"host-1"}
-	// {"level":"info","logger":"parent.child","message":"test log from child","hostname":"host-1"}
+	// {"level":"info","logger":"sys1","message":"test log from sys1","hostname":"host-1","other":"fields"}
+	// {"level":"info","logger":"sys2","message":"test log from sys2","hostname":"host-1","other":"fields"}
 }

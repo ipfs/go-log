@@ -16,12 +16,11 @@ func clearGoLogEnvVars() {
 	os.Unsetenv(envLoggingFmt)
 	os.Unsetenv(envLoggingCfg)
 	os.Unsetenv(envLoggingFile)
-	os.Unsetenv(envTracingFile)
 }
 
 func TestSetupLogging(t *testing.T) {
 	t.Run("default logger configuration", func(t *testing.T) {
-		defer Cleanup()
+		defer cleanup()
 		defer clearGoLogEnvVars()
 		clearGoLogEnvVars()
 		SetupLogging()
@@ -68,7 +67,7 @@ func TestSetupLogging(t *testing.T) {
 	})
 
 	t.Run("env var logger configuration", func(t *testing.T) {
-		defer Cleanup()
+		defer cleanup()
 		defer clearGoLogEnvVars()
 		clearGoLogEnvVars()
 		wantLvl := "info"
@@ -122,7 +121,7 @@ func TestSetupLogging(t *testing.T) {
 	})
 
 	t.Run("zap json config logger configuration", func(t *testing.T) {
-		defer Cleanup()
+		defer cleanup()
 		defer clearGoLogEnvVars()
 		clearGoLogEnvVars()
 		wantLvl := "debug"
@@ -171,7 +170,7 @@ func TestSetupLogging(t *testing.T) {
 	})
 
 	t.Run("zap json config with env var override", func(t *testing.T) {
-		defer Cleanup()
+		defer cleanup()
 		defer clearGoLogEnvVars()
 		clearGoLogEnvVars()
 		wantLvl := "error"

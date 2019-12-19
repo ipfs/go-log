@@ -40,14 +40,12 @@ func Logger(system string) *ZapEventLogger {
 		system = "undefined"
 	}
 
-	logger := getLogger(system)
-
-	return &ZapEventLogger{system: system, SugaredLogger: *logger}
+	return getLogger(system)
 }
 
 // ZapEventLogger implements the EventLogger and wraps a zap Sugared Logger.
 type ZapEventLogger struct {
-	zap.SugaredLogger
+	*zap.SugaredLogger
 	system string
 }
 
@@ -56,8 +54,13 @@ type ZapEventLogger struct {
 // that are provided to the logger via SetFieldsOnAllLoggers and these
 // only last for the life time of this particular ZapEventLogger instance.
 // Note: the fields will be passed to any children loggers of this logger.
-func (zel *ZapEventLogger) SetFieldsOnLogger(name string, args ...interface{}) {
-	zel.SugaredLogger = *zel.With(args...)
+func (zel *ZapEventLogger) SetFieldsOnLogger(args ...interface{}) {
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+
+	newSugaredLogger := zel.With(args...)
+	loggers[zel.system].SugaredLogger = newSugaredLogger
+	//zel.SugaredLogger = newSugaredLogger
 }
 
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
