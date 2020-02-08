@@ -24,22 +24,11 @@ var log = Logger("eventlog")
 // StandardLogger provides API compatibility with standard printf loggers
 // eg. go-logging
 type StandardLogger interface {
-	Debug(args ...interface{})
-	Debugf(format string, args ...interface{})
-	Error(args ...interface{})
-	Errorf(format string, args ...interface{})
-	Fatal(args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Info(args ...interface{})
-	Infof(format string, args ...interface{})
-	Panic(args ...interface{})
-	Panicf(format string, args ...interface{})
+	log2.StandardLogger
 	// Deprecated use Warn
 	Warning(args ...interface{})
 	// Deprecated use Warnf
 	Warningf(format string, args ...interface{})
-	Warn(args ...interface{})
-	Warnf(format string, args ...interface{})
 }
 
 // EventLogger extends the StandardLogger interface to allow for log items

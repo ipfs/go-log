@@ -1,7 +1,6 @@
 package log
 
 import (
-	"fmt"
 	tracer "github.com/ipfs/go-log/tracer"
 	lwriter "github.com/ipfs/go-log/writer"
 	"os"
@@ -9,9 +8,6 @@ import (
 	opentrace "github.com/opentracing/opentracing-go"
 
 	log2 "github.com/ipfs/go-log/v2"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 func init() {
@@ -20,77 +16,18 @@ func init() {
 
 // Logging environment variables
 const (
-	// IPFS_* prefixed env vars kept for backwards compatibility
-	// for this release. They will not be available in the next
-	// release.
-	//
-	// GOLOG_* env vars take precedences over IPFS_* env vars.
-	envIPFSLogging    = "IPFS_LOGGING"
-	envIPFSLoggingFmt = "IPFS_LOGGING_FMT"
-
-	envLogging    = "GOLOG_LOG_LEVEL"
-	envLoggingFmt = "GOLOG_LOG_FMT"
-
-	envLoggingFile = "GOLOG_FILE"         // /path/to/file
 	envTracingFile = "GOLOG_TRACING_FILE" // /path/to/file
 )
 
-// SetupLogging will initialize the logger backend and set the flags.
-// TODO calling this in `init` pushes all configuration to env variables
-// - move it out of `init`? then we need to change all the code (js-ipfs, go-ipfs) to call this explicitly
-// - have it look for a config file? need to define what that is
-var zapCfg = zap.NewProductionConfig()
-
 func SetupLogging() {
-	loggingFmt := os.Getenv(envLoggingFmt)
-	if loggingFmt == "" {
-		loggingFmt = os.Getenv(envIPFSLoggingFmt)
-	}
-	// colorful or plain
-	switch loggingFmt {
-	case "nocolor":
-		zapCfg.Encoding = "console"
-		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	case "json":
-		zapCfg.Encoding = "json"
-	default:
-		zapCfg.Encoding = "console"
-		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	}
-
-	zapCfg.Sampling = nil
-	zapCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-
-	zapCfg.OutputPaths = []string{"stderr"}
-	// check if we log to a file
-	if logfp := os.Getenv(envLoggingFile); len(logfp) > 0 {
-		zapCfg.OutputPaths = append(zapCfg.OutputPaths, logfp)
-	}
-
-	// set the backend(s)
-	lvl := LevelError
-
-	logenv := os.Getenv(envLogging)
-	if logenv == "" {
-		logenv = os.Getenv(envIPFSLogging)
-	}
-
-	if logenv != "" {
-		var err error
-		lvl, err = LevelFromString(logenv)
-		if err != nil {
-			fmt.Println("error setting log levels", err)
-		}
-	}
-	zapCfg.Level.SetLevel(zapcore.Level(lvl))
+	// We're importing V2. Given that we setup logging on init, we should be
+	// fine skipping the rest of the initialization.
 
 	// TracerPlugins are instantiated after this, so use loggable tracer
 	// by default, if a TracerPlugin is added it will override this
 	lgblRecorder := tracer.NewLoggableRecorder()
 	lgblTracer := tracer.New(lgblRecorder)
 	opentrace.SetGlobalTracer(lgblTracer)
-
-	SetAllLoggers(lvl)
 
 	if tracingfp := os.Getenv(envTracingFile); len(tracingfp) > 0 {
 		f, err := os.Create(tracingfp)
@@ -104,13 +41,12 @@ func SetupLogging() {
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
 func SetDebugLogging() {
-	SetAllLoggers(LevelDebug)
+	log2.SetDebugLogging()
 }
 
 // SetAllLoggers changes the logging level of all loggers to lvl
 func SetAllLoggers(lvl LogLevel) {
-	lvl2 := log2.LogLevel(lvl)
-	log2.SetAllLoggers(lvl2)
+	log2.SetAllLoggers(lvl)
 }
 
 // SetLogLevel changes the log level of a specific subsystem
