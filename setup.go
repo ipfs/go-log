@@ -28,8 +28,7 @@ const (
 	envLogging    = "GOLOG_LOG_LEVEL"
 	envLoggingFmt = "GOLOG_LOG_FMT"
 
-	envLoggingFile = "GOLOG_FILE"         // /path/to/file
-	envTracingFile = "GOLOG_TRACING_FILE" // /path/to/file
+	envLoggingFile = "GOLOG_FILE" // /path/to/file
 )
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger

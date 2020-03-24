@@ -12,7 +12,10 @@ import (
 
 func BenchmarkSimpleInfo(b *testing.B) {
 	l := Logger("bench")
-	SetLogLevel("bench", "info")
+	err := SetLogLevel("bench", "info")
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -25,7 +28,10 @@ var logString = "String, IDK what to write, let's punch a keyboard. jkdlsjklfdjf
 
 func BenchmarkFormatInfo(b *testing.B) {
 	l := Logger("bench")
-	SetLogLevel("bench", "info")
+	err := SetLogLevel("bench", "info")
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -36,7 +42,10 @@ func BenchmarkFormatInfo(b *testing.B) {
 
 func BenchmarkFormatInfoMulti(b *testing.B) {
 	l := Logger("bench")
-	SetLogLevel("bench", "info")
+	err := SetLogLevel("bench", "info")
+	if err != nil {
+		b.Fatal(err)
+	}
 	var wg sync.WaitGroup
 
 	goroutines := 16
