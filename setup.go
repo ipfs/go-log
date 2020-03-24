@@ -68,7 +68,11 @@ func SetupLogging() {
 	zapCfg.OutputPaths = []string{"stderr"}
 	// check if we log to a file
 	if logfp := os.Getenv(envLoggingFile); len(logfp) > 0 {
-		zapCfg.OutputPaths = append(zapCfg.OutputPaths, logfp)
+		if path, err := normalizePath(logfp); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to resolve log path '%q', logging to stderr only: %s\n", logfp, err)
+		} else {
+			zapCfg.OutputPaths = append(zapCfg.OutputPaths, path)
+		}
 	}
 
 	// set the backend(s)
@@ -83,7 +87,7 @@ func SetupLogging() {
 		var err error
 		lvl, err = LevelFromString(logenv)
 		if err != nil {
-			fmt.Println("error setting log levels", err)
+			fmt.Fprintf(os.Stderr, "error setting log levels: %s\n", err)
 		}
 	}
 	zapCfg.Level.SetLevel(zapcore.Level(lvl))
