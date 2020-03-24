@@ -20,7 +20,7 @@ func normalizePath(p string) (string, error) {
 	if !strings.HasPrefix(p, "\\\\") {
 		// It's a drive: path!
 		// Return a UNC path.
-		p = "\\\\?\\" + p
+		p = "\\\\%3F\\" + p
 	}
 
 	// This will return file:////?/c:/foobar
