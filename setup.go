@@ -64,6 +64,7 @@ func SetupLogging() {
 
 	zapCfg.Sampling = nil
 	zapCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	zapCfg.DisableStacktrace = true
 
 	zapCfg.OutputPaths = []string{"stderr"}
 	// check if we log to a file
