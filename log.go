@@ -51,6 +51,18 @@ type ZapEventLogger struct {
 	system string
 }
 
+// Warning is for compatibility
+// Deprecated: use Warn(args ...interface{}) instead
+func (logger *ZapEventLogger) Warning(args ...interface{}) {
+	logger.Warn(args...)
+}
+
+// Warningf is for compatibility
+// Deprecated: use Warnf(format string, args ...interface{}) instead
+func (logger *ZapEventLogger) Warningf(format string, args ...interface{}) {
+	logger.Warnf(format, args...)
+}
+
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
 func FormatRFC3339(t time.Time) string {
 	return t.UTC().Format(time.RFC3339Nano)
