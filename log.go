@@ -41,26 +41,33 @@ func Logger(system string) *ZapEventLogger {
 	}
 
 	logger := getLogger(system)
+	skipLogger := logger.With(zap.AddCallerSkip(1))
 
-	return &ZapEventLogger{system: system, SugaredLogger: *logger}
+	return &ZapEventLogger{
+		system:        system,
+		SugaredLogger: *logger,
+		skipLogger:    *skipLogger,
+	}
 }
 
 // ZapEventLogger implements the EventLogger and wraps a go-logging Logger
 type ZapEventLogger struct {
 	zap.SugaredLogger
-	system string
+	// used to fix the caller location when calling Warning and Warningf.
+	skipLogger zap.SugaredLogger
+	system     string
 }
 
 // Warning is for compatibility
 // Deprecated: use Warn(args ...interface{}) instead
 func (logger *ZapEventLogger) Warning(args ...interface{}) {
-	logger.Warn(args...)
+	logger.skipLogger.Warn(args...)
 }
 
 // Warningf is for compatibility
 // Deprecated: use Warnf(format string, args ...interface{}) instead
 func (logger *ZapEventLogger) Warningf(format string, args ...interface{}) {
-	logger.Warnf(format, args...)
+	logger.skipLogger.Warnf(format, args...)
 }
 
 // FormatRFC3339 returns the given time in UTC with RFC3999Nano format.
