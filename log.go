@@ -1,6 +1,5 @@
-// Package log is the logging library used by IPFS
-// (https://github.com/ipfs/go-ipfs). It uses a modified version of
-// https://godoc.org/github.com/whyrusleeping/go-logging .
+// Package log is the logging library used by IPFS & libp2p
+// (https://github.com/ipfs/go-ipfs).
 package log
 
 import (
@@ -41,7 +40,7 @@ func Logger(system string) *ZapEventLogger {
 	}
 
 	logger := getLogger(system)
-	skipLogger := logger.With(zap.AddCallerSkip(1))
+	skipLogger := logger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar()
 
 	return &ZapEventLogger{
 		system:        system,
