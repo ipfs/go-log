@@ -3,6 +3,7 @@ package log
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"sync"
@@ -12,6 +13,11 @@ import (
 )
 
 func init() {
+	// register the global pipes sink to allow us to specify it as an output
+	zap.RegisterSink("pipes", func(*url.URL) (zap.Sink, error) {
+		return pipes, nil
+	})
+
 	SetupLogging()
 }
 
@@ -66,7 +72,7 @@ func SetupLogging() {
 	zapCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	zapCfg.DisableStacktrace = true
 
-	zapCfg.OutputPaths = []string{"stderr"}
+	zapCfg.OutputPaths = []string{"stderr", "pipes://"}
 	// check if we log to a file
 	if logfp := os.Getenv(envLoggingFile); len(logfp) > 0 {
 		if path, err := normalizePath(logfp); err != nil {
