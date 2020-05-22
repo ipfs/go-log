@@ -78,7 +78,8 @@ func SetupLogging() {
 		if path, err := normalizePath(logfp); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to resolve log path '%q', logging to stderr only: %s\n", logfp, err)
 		} else {
-			zapCfg.OutputPaths = append(zapCfg.OutputPaths, path)
+			// If file is specified, we will only log to the file
+			zapCfg.OutputPaths = []string{path}
 		}
 	}
 
