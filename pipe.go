@@ -37,7 +37,7 @@ func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
 	loggerMutex.Unlock()
 
 	for _, o := range opts {
-		o.SetOption(&opt)
+		o.setOption(&opt)
 	}
 
 	r, w := io.Pipe()
@@ -58,12 +58,12 @@ type pipeReaderOptions struct {
 }
 
 type PipeReaderOption interface {
-	SetOption(*pipeReaderOptions)
+	setOption(*pipeReaderOptions)
 }
 
 type pipeReaderOptionFunc func(*pipeReaderOptions)
 
-func (p pipeReaderOptionFunc) SetOption(o *pipeReaderOptions) {
+func (p pipeReaderOptionFunc) setOption(o *pipeReaderOptions) {
 	p(o)
 }
 
