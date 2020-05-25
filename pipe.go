@@ -3,6 +3,7 @@ package log
 import (
 	"io"
 
+	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -24,7 +25,7 @@ func (p *PipeReader) Close() error {
 	if p.core != nil {
 		loggerCore.DeleteCore(p.core)
 	}
-	return p.closer.Close()
+	return multierr.Append(p.core.Sync(), p.closer.Close())
 }
 
 // NewPipeReader creates a new in-memory reader that reads from all loggers
