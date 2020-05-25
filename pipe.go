@@ -2,103 +2,15 @@ package log
 
 import (
 	"io"
-	"sync"
 
 	"go.uber.org/zap/zapcore"
 )
 
-// pipes is the global instance of pipesSink
-var pipes = newPipesSink()
-
-// pipesSink is a Zap Sink that copies log output to zero or more
-// connected pipe readers. Pipe readers represent in-process readers
-// that are listening to the log output.
-type pipesSink struct {
-	mu       sync.RWMutex
-	combined zapcore.WriteSyncer
-	writers  map[*PipeReader]zapcore.WriteSyncer
-}
-
-func newPipesSink() *pipesSink {
-	s := &pipesSink{
-		writers: make(map[*PipeReader]zapcore.WriteSyncer),
-	}
-	// Initially this will result in a WriteSyncer that wraps io.Discard
-	s.buildCombinedWriter()
-	return s
-}
-
-func (s *pipesSink) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// We can ignore errors since these in-memory pipes won't error on
-	// close and, besides, we are most likely closing the process.
-	for pr := range s.writers {
-		_ = pr.r.Close()
-	}
-
-	return nil
-}
-
-func (s *pipesSink) Sync() error {
-	s.mu.RLock()
-	err := s.combined.Sync()
-	s.mu.RUnlock()
-	return err
-}
-
-func (s *pipesSink) Write(b []byte) (int, error) {
-	s.mu.RLock()
-	n, err := s.combined.Write(b)
-	s.mu.RUnlock()
-	return n, err
-}
-
-// NewReader registers a new pipe reader and rebuilds the
-// combined Zap WriteSyncer to include it.
-func (s *pipesSink) NewReader() *PipeReader {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	r, w := io.Pipe()
-	pr := &PipeReader{
-		r:    r,
-		sink: s,
-	}
-
-	ws := zapcore.AddSync(w)
-	s.writers[pr] = ws
-
-	s.buildCombinedWriter()
-
-	return pr
-}
-
-// note the caller must hold s.mu before calling buildCombinedWriter
-func (s *pipesSink) buildCombinedWriter() {
-	current := make([]zapcore.WriteSyncer, 0, len(s.writers))
-	for _, ws := range s.writers {
-		current = append(current, ws)
-	}
-	s.combined = zapcore.NewMultiWriteSyncer(current...)
-}
-
-// RemoveReader unregisters a pipe reader and rebuilds the
-// combined Zap WriteSyncer to exclude it.
-func (s *pipesSink) RemoveReader(p *PipeReader) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	delete(s.writers, p)
-	s.buildCombinedWriter()
-}
-
 // A PipeReader is a reader that reads from the logger. It is synchronous
 // so blocking on read will affect logging performance.
 type PipeReader struct {
-	sink *pipesSink
 	r    *io.PipeReader
+	core zapcore.Core
 }
 
 // Read implements the standard Read interface
@@ -108,12 +20,63 @@ func (p *PipeReader) Read(data []byte) (int, error) {
 
 // Close unregisters the reader from the logger.
 func (p *PipeReader) Close() error {
-	p.sink.RemoveReader(p)
+	if p.core != nil {
+		loggerCore.DeleteCore(p.core)
+	}
 	return p.r.Close()
 }
 
-// NewPipeReader creates a new in-memory reader that reads from the logger.
+// NewPipeReader creates a new in-memory reader that reads from all loggers
 // The caller must call Close on the returned reader when done.
-func NewPipeReader() *PipeReader {
-	return pipes.NewReader()
+func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
+	loggerMutex.Lock()
+	opt := pipeReaderOptions{
+		format: primaryFormat,
+		level:  primaryLevel,
+	}
+	loggerMutex.Unlock()
+
+	for _, o := range opts {
+		o.setOption(&opt)
+	}
+
+	r, w := io.Pipe()
+
+	p := &PipeReader{
+		r:    r,
+		core: newCore(opt.format, zapcore.AddSync(w), opt.level),
+	}
+
+	loggerCore.AddCore(p.core)
+
+	return p
+}
+
+type pipeReaderOptions struct {
+	format LogFormat
+	level  LogLevel
+}
+
+type PipeReaderOption interface {
+	setOption(*pipeReaderOptions)
+}
+
+type pipeReaderOptionFunc func(*pipeReaderOptions)
+
+func (p pipeReaderOptionFunc) setOption(o *pipeReaderOptions) {
+	p(o)
+}
+
+// PipeFormat sets the output format of the pipe reader
+func PipeFormat(format LogFormat) PipeReaderOption {
+	return pipeReaderOptionFunc(func(o *pipeReaderOptions) {
+		o.format = format
+	})
+}
+
+// PipeLevel sets the log level of logs sent to the pipe reader.
+func PipeLevel(level LogLevel) PipeReaderOption {
+	return pipeReaderOptionFunc(func(o *pipeReaderOptions) {
+		o.level = level
+	})
 }
