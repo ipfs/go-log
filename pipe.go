@@ -28,13 +28,18 @@ func (p *PipeReader) Close() error {
 
 // NewPipeReader creates a new in-memory reader that reads from all loggers
 // The caller must call Close on the returned reader when done.
+//
+// By default, it:
+//
+// 1. Logs JSON.
+// 2. Logs at the Debug level. However, unless SetLogLevel is called on a
+//    subsystem logger to decrease the default log level, for that subsystem,
+//    only error messages will be logged.
 func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
-	loggerMutex.Lock()
 	opt := pipeReaderOptions{
-		format: defaultFormat,
+		format: JSONOutput,
 		level:  LevelDebug,
 	}
-	loggerMutex.Unlock()
 
 	for _, o := range opts {
 		o.setOption(&opt)
