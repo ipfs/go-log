@@ -9,8 +9,9 @@ import (
 // A PipeReader is a reader that reads from the logger. It is synchronous
 // so blocking on read will affect logging performance.
 type PipeReader struct {
-	r    *io.PipeReader
-	core zapcore.Core
+	r      *io.PipeReader
+	closer io.Closer
+	core   zapcore.Core
 }
 
 // Read implements the standard Read interface
@@ -23,7 +24,7 @@ func (p *PipeReader) Close() error {
 	if p.core != nil {
 		loggerCore.DeleteCore(p.core)
 	}
-	return p.r.Close()
+	return p.closer.Close()
 }
 
 // NewPipeReader creates a new in-memory reader that reads from all loggers
@@ -48,8 +49,9 @@ func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
 	r, w := io.Pipe()
 
 	p := &PipeReader{
-		r:    r,
-		core: newCore(opt.format, zapcore.AddSync(w), opt.level),
+		r:      r,
+		closer: w,
+		core:   newCore(opt.format, zapcore.AddSync(w), opt.level),
 	}
 
 	loggerCore.AddCore(p.core)
