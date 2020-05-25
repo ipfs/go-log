@@ -31,8 +31,8 @@ func (p *PipeReader) Close() error {
 func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
 	loggerMutex.Lock()
 	opt := pipeReaderOptions{
-		format: primaryFormat,
-		level:  primaryLevel,
+		format: defaultFormat,
+		level:  LevelDebug,
 	}
 	loggerMutex.Unlock()
 
