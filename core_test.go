@@ -39,7 +39,9 @@ func TestNewCoreFormat(t *testing.T) {
 		ws := zapcore.AddSync(buf)
 
 		core := newCore(tc.format, ws, LevelDebug)
-		core.Write(entry, nil)
+		if err := core.Write(entry, nil); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
 		got := buf.String()
 		if got != tc.want {
@@ -66,7 +68,9 @@ func TestLockedMultiCoreAddCore(t *testing.T) {
 		Message:    "scooby",
 		Time:       time.Date(2010, 5, 23, 15, 14, 0, 0, time.UTC),
 	}
-	mc.Write(entry, nil)
+	if err := mc.Write(entry, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	want1 := "2010-05-23T15:14:00.000Z\tINFO\tmain\tscooby\n"
 	got1 := buf1.String()
@@ -97,7 +101,9 @@ func TestLockedMultiCoreDeleteCore(t *testing.T) {
 		Message:    "scooby",
 		Time:       time.Date(2010, 5, 23, 15, 14, 0, 0, time.UTC),
 	}
-	mc.Write(entry, nil)
+	if err := mc.Write(entry, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	buf2 := &bytes.Buffer{}
 	core2 := newCore(ColorizedOutput, zapcore.AddSync(buf2), LevelDebug)
@@ -114,7 +120,9 @@ func TestLockedMultiCoreDeleteCore(t *testing.T) {
 		Time:       time.Date(2010, 5, 23, 15, 15, 0, 0, time.UTC),
 	}
 
-	mc.Write(entry2, nil)
+	if err := mc.Write(entry2, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	want1 := "2010-05-23T15:14:00.000Z\tINFO\tmain\tscooby\n"
 	got1 := buf1.String()
@@ -144,7 +152,9 @@ func TestLockedMultiCoreReplaceCore(t *testing.T) {
 		Message:    "scooby",
 		Time:       time.Date(2010, 5, 23, 15, 14, 0, 0, time.UTC),
 	}
-	mc.Write(entry, nil)
+	if err := mc.Write(entry, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	buf2 := &bytes.Buffer{}
 	core2 := newCore(ColorizedOutput, zapcore.AddSync(buf2), LevelDebug)
@@ -160,7 +170,9 @@ func TestLockedMultiCoreReplaceCore(t *testing.T) {
 		Time:       time.Date(2010, 5, 23, 15, 15, 0, 0, time.UTC),
 	}
 
-	mc.Write(entry2, nil)
+	if err := mc.Write(entry2, nil); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	want1 := "2010-05-23T15:14:00.000Z\tINFO\tmain\tscooby\n"
 	got1 := buf1.String()

@@ -28,7 +28,9 @@ func TestGetLoggerDefault(t *testing.T) {
 	w.Close()
 
 	buf := &bytes.Buffer{}
-	io.Copy(buf, r)
+	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if !strings.Contains(buf.String(), "scooby") {
 		t.Errorf("got %q, wanted it to contain log output", buf.String())

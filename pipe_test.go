@@ -21,7 +21,9 @@ func TestNewPipeReader(t *testing.T) {
 	buf := &bytes.Buffer{}
 	go func() {
 		defer wg.Done()
-		io.Copy(buf, r)
+		if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
+			t.Errorf("unexpected error: %v", err)
+		}
 	}()
 
 	log.Error("scooby")
@@ -45,7 +47,9 @@ func TestNewPipeReaderFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	go func() {
 		defer wg.Done()
-		io.Copy(buf, r)
+		if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
+			t.Errorf("unexpected error: %v", err)
+		}
 	}()
 
 	log.Error("scooby")
@@ -74,7 +78,9 @@ func TestNewPipeReaderLevel(t *testing.T) {
 	buf := &bytes.Buffer{}
 	go func() {
 		defer wg.Done()
-		io.Copy(buf, r)
+		if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
+			t.Errorf("unexpected error: %v", err)
+		}
 	}()
 
 	log.Debug("scooby")
