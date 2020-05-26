@@ -3,14 +3,16 @@ package log
 import (
 	"io"
 
+	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 )
 
 // A PipeReader is a reader that reads from the logger. It is synchronous
 // so blocking on read will affect logging performance.
 type PipeReader struct {
-	r    *io.PipeReader
-	core zapcore.Core
+	r      *io.PipeReader
+	closer io.Closer
+	core   zapcore.Core
 }
 
 // Read implements the standard Read interface
@@ -23,18 +25,23 @@ func (p *PipeReader) Close() error {
 	if p.core != nil {
 		loggerCore.DeleteCore(p.core)
 	}
-	return p.r.Close()
+	return multierr.Append(p.core.Sync(), p.closer.Close())
 }
 
 // NewPipeReader creates a new in-memory reader that reads from all loggers
 // The caller must call Close on the returned reader when done.
+//
+// By default, it:
+//
+// 1. Logs JSON. This can be changed by passing the PipeFormat option.
+// 2. Logs everything that would otherwise be logged to the "primary" log
+//    output. That is, everything enabled by SetLogLevel. The minimum log level
+//    can be increased by passing the PipeLevel option.
 func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
-	loggerMutex.Lock()
 	opt := pipeReaderOptions{
-		format: primaryFormat,
-		level:  primaryLevel,
+		format: JSONOutput,
+		level:  LevelDebug,
 	}
-	loggerMutex.Unlock()
 
 	for _, o := range opts {
 		o.setOption(&opt)
@@ -43,8 +50,9 @@ func NewPipeReader(opts ...PipeReaderOption) *PipeReader {
 	r, w := io.Pipe()
 
 	p := &PipeReader{
-		r:    r,
-		core: newCore(opt.format, zapcore.AddSync(w), opt.level),
+		r:      r,
+		closer: w,
+		core:   newCore(opt.format, zapcore.AddSync(w), opt.level),
 	}
 
 	loggerCore.AddCore(p.core)

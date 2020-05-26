@@ -65,11 +65,11 @@ var loggerMutex sync.RWMutex // guards access to global logger state
 var loggers = make(map[string]*zap.SugaredLogger)
 var levels = make(map[string]zap.AtomicLevel)
 
-// primaryFormat is the default format of the primary core used for logging
+// primaryFormat is the format of the primary core used for logging
 var primaryFormat LogFormat = ColorizedOutput
 
-// primaryLevel is the default log level of the primary core used for logging
-var primaryLevel LogLevel = LevelError
+// defaultLevel is the default log level
+var defaultLevel LogLevel = LevelError
 
 // primaryCore is the primary logging core
 var primaryCore zapcore.Core
@@ -86,7 +86,7 @@ func SetupLogging(cfg Config) {
 	defer loggerMutex.Unlock()
 
 	primaryFormat = cfg.Format
-	primaryLevel = cfg.Level
+	defaultLevel = cfg.Level
 
 	outputPaths := []string{}
 
@@ -111,7 +111,7 @@ func SetupLogging(cfg Config) {
 		panic(fmt.Sprintf("unable to open logging output: %v", err))
 	}
 
-	newPrimaryCore := newCore(primaryFormat, ws, primaryLevel)
+	newPrimaryCore := newCore(primaryFormat, ws, LevelDebug) // the main core needs to log everything.
 	if primaryCore != nil {
 		loggerCore.ReplaceCore(primaryCore, newPrimaryCore)
 	} else {
@@ -119,7 +119,7 @@ func SetupLogging(cfg Config) {
 	}
 	primaryCore = newPrimaryCore
 
-	setAllLoggers(primaryLevel)
+	setAllLoggers(defaultLevel)
 }
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
@@ -209,7 +209,7 @@ func getLogger(name string) *zap.SugaredLogger {
 	defer loggerMutex.Unlock()
 	log, ok := loggers[name]
 	if !ok {
-		levels[name] = zap.NewAtomicLevelAt(zapcore.Level(primaryLevel))
+		levels[name] = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
 		log = zap.New(loggerCore).
 			WithOptions(zap.IncreaseLevel(levels[name])).
 			Named(name).
