@@ -65,8 +65,8 @@ var loggerMutex sync.RWMutex // guards access to global logger state
 var loggers = make(map[string]*zap.SugaredLogger)
 var levels = make(map[string]zap.AtomicLevel)
 
-// defaultFormat is the default format of the primary core used for logging
-var defaultFormat LogFormat = ColorizedOutput
+// primaryFormat is the format of the primary core used for logging
+var primaryFormat LogFormat = ColorizedOutput
 
 // defaultLevel is the default log level
 var defaultLevel LogLevel = LevelError
@@ -85,7 +85,7 @@ func SetupLogging(cfg Config) {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
 
-	defaultFormat = cfg.Format
+	primaryFormat = cfg.Format
 	defaultLevel = cfg.Level
 
 	outputPaths := []string{}
@@ -111,7 +111,7 @@ func SetupLogging(cfg Config) {
 		panic(fmt.Sprintf("unable to open logging output: %v", err))
 	}
 
-	newPrimaryCore := newCore(defaultFormat, ws, LevelDebug) // the main core needs to log everything.
+	newPrimaryCore := newCore(primaryFormat, ws, LevelDebug) // the main core needs to log everything.
 	if primaryCore != nil {
 		loggerCore.ReplaceCore(primaryCore, newPrimaryCore)
 	} else {
