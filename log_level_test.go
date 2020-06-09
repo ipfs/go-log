@@ -17,6 +17,7 @@ func TestLogLevel(t *testing.T) {
 		for {
 			var entry struct {
 				Message string `json:"msg"`
+				Caller  string `json:"caller"`
 			}
 			err := decoder.Decode(&entry)
 			switch err {
@@ -29,6 +30,9 @@ func TestLogLevel(t *testing.T) {
 			}
 			if entry.Message != "bar" {
 				t.Errorf("unexpected message: %s", entry.Message)
+			}
+			if entry.Caller == "" {
+				t.Errorf("no caller in log entry")
 			}
 		}
 	}()
