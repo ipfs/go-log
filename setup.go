@@ -211,7 +211,10 @@ func getLogger(name string) *zap.SugaredLogger {
 	if !ok {
 		levels[name] = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
 		log = zap.New(loggerCore).
-			WithOptions(zap.IncreaseLevel(levels[name])).
+			WithOptions(
+				zap.IncreaseLevel(levels[name]),
+				zap.AddCaller(),
+			).
 			Named(name).
 			Sugar()
 
