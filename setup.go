@@ -274,7 +274,7 @@ func configFromEnv() Config {
 		case "stderr":
 			cfg.Stderr = true
 		case "file":
-			if cfg.File != "" {
+			if cfg.File == "" {
 				fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
 			}
 		}
