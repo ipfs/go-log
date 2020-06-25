@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 
 	"go.uber.org/zap"
@@ -265,48 +266,20 @@ func configFromEnv() Config {
 	}
 
 	output := os.Getenv(envLoggingOutput)
+	outputOptions := strings.Split(output, "+")
 	//TODO: fix lanzafame's super lazy impl...
-	switch output {
-	case "stdout":
-		cfg.Stdout = true
-		cfg.Stderr = false
-		cfg.File = ""
-	case "stderr":
-		cfg.Stderr = true
-		cfg.Stdout = false
-		cfg.File = ""
-	case "file":
-		cfg.File = os.Getenv(envLoggingFile)
-		if cfg.File != "" {
-			fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
+	for _, opt := range outputOptions {
+		switch opt {
+		case "stdout":
+			cfg.Stdout = true
+		case "stderr":
+			cfg.Stderr = true
+		case "file":
+			cfg.File = os.Getenv(envLoggingFile)
+			if cfg.File != "" {
+				fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
+			}
 		}
-		cfg.Stderr = false
-		cfg.Stdout = false
-	case "stdout+file", "file+stdout":
-		cfg.File = os.Getenv(envLoggingFile)
-		if cfg.File != "" {
-			fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
-		}
-		cfg.Stderr = false
-		cfg.Stdout = true
-	case "stderr+file", "file+stderr":
-		cfg.File = os.Getenv(envLoggingFile)
-		if cfg.File != "" {
-			fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
-		}
-		cfg.Stderr = true
-		cfg.Stdout = false
-	case "stdout+stderr", "stderr+stdout":
-		cfg.File = ""
-		cfg.Stderr = true
-		cfg.Stdout = true
-	case "stdout+stderr+file", "stdout+file+stderr", "stderr+stdout+file", "stderr+file+stdout", "file+stdout+stderr", "file+stderr+stdout":
-		cfg.File = os.Getenv(envLoggingFile)
-		if cfg.File != "" {
-			fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
-		}
-		cfg.Stderr = true
-		cfg.Stdout = true
 	}
 
 	return cfg
