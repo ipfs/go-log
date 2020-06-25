@@ -267,7 +267,6 @@ func configFromEnv() Config {
 
 	output := os.Getenv(envLoggingOutput)
 	outputOptions := strings.Split(output, "+")
-	//TODO: fix lanzafame's super lazy impl...
 	for _, opt := range outputOptions {
 		switch opt {
 		case "stdout":
