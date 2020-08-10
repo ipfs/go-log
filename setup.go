@@ -30,6 +30,8 @@ const (
 	envLoggingFmt = "GOLOG_LOG_FMT"
 
 	envLoggingFile = "GOLOG_FILE" // /path/to/file
+	envLoggingURL = "GOLOG_URL" // url that will be processed by sink in the zap
+
 	envLoggingOutput = "GOLOG_OUTPUT" // possible values: stdout|stderr|file combine multiple values with '+'
 )
 
@@ -56,6 +58,9 @@ type Config struct {
 
 	// File is a path to a file that logs will be written to.
 	File string
+
+	// URL with schema supported by zap. Use zap.RegisterSink
+	URL string
 }
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
@@ -106,6 +111,9 @@ func SetupLogging(cfg Config) {
 		} else {
 			outputPaths = append(outputPaths, path)
 		}
+	}
+	if len(cfg.URL) > 0 {
+		outputPaths = append(outputPaths, cfg.URL)
 	}
 
 	ws, _, err := zap.Open(outputPaths...)
@@ -265,6 +273,7 @@ func configFromEnv() Config {
 		cfg.Stderr = false
 	}
 
+	cfg.URL = os.Getenv(envLoggingURL)
 	output := os.Getenv(envLoggingOutput)
 	outputOptions := strings.Split(output, "+")
 	for _, opt := range outputOptions {
@@ -276,6 +285,10 @@ func configFromEnv() Config {
 		case "file":
 			if cfg.File == "" {
 				fmt.Fprint(os.Stderr, "please specify a GOLOG_FILE value to write to")
+			}
+		case "url":
+			if cfg.URL == "" {
+				fmt.Fprint(os.Stderr, "please specify a GOLOG_URL value to write to")
 			}
 		}
 	}
