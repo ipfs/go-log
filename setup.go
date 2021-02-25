@@ -33,7 +33,7 @@ const (
 	envLoggingURL = "GOLOG_URL" // url that will be processed by sink in the zap
 
 	envLoggingOutput = "GOLOG_OUTPUT" // possible values: stdout|stderr|file combine multiple values with '+'
-	envLoggingLabels = "GOLOG_LOG_LABELS" // comma-separated key-value pairs, i.e. "app,example_app,dc,sjc-1"
+	envLoggingLabels = "GOLOG_LOG_LABELS" // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
 )
 
 type LogFormat int
@@ -64,7 +64,7 @@ type Config struct {
 	URL string
 
 	// Labels is a set of key-values to apply to all loggers
-	Labels []string
+	Labels map[string]string
 }
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
@@ -127,10 +127,8 @@ func SetupLogging(cfg Config) {
 
 	newPrimaryCore := newCore(primaryFormat, ws, LevelDebug) // the main core needs to log everything.
 
-	if len(cfg.Labels) > 0 {
-		for i := 0; i < len(cfg.Labels); i=i+2 {
-			newPrimaryCore = newPrimaryCore.With([]zap.Field{zap.String(cfg.Labels[i], cfg.Labels[i+1])})
-		}
+	for k, v := range cfg.Labels {
+		newPrimaryCore = newPrimaryCore.With([]zap.Field{zap.String(k, v)})
 	}
 
 	if primaryCore != nil {
@@ -251,6 +249,7 @@ func configFromEnv() Config {
 		Format: ColorizedOutput,
 		Stderr: true,
 		Level:  LevelError,
+		Labels: map[string]string{},
 	}
 
 	format := os.Getenv(envLoggingFmt)
@@ -307,10 +306,9 @@ func configFromEnv() Config {
 	labels := os.Getenv(envLoggingLabels)
 	if labels != "" {
 		labelKVs := strings.Split(labels, ",")
-		if len(labelKVs)%2 != 0 {
-			fmt.Fprint(os.Stderr, "odd number of args for GOLOG_LOG_LABELS; please specify complete key-value pairs")
-		} else {
-			cfg.Labels = labelKVs
+		for _, label := range labelKVs {
+			kv := strings.Split(label, "=")
+			cfg.Labels[kv[0]] = kv[1]
 		}
 	}
 
