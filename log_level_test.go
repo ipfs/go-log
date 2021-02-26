@@ -37,11 +37,17 @@ func TestLogLevel(t *testing.T) {
 		}
 	}()
 	logger.Debugw("foo")
-	SetLogLevel(subsystem, "debug")
+	if err := SetLogLevel(subsystem, "debug"); err != nil {
+		t.Error(err)
+	}
 	logger.Debugw("bar")
 	SetAllLoggers(LevelInfo)
 	logger.Debugw("baz")
-	logger.Sync()
-	reader.Close()
+	// ignore the error because
+	// https://github.com/uber-go/zap/issues/880
+	_ = logger.Sync()
+	if err := reader.Close(); err != nil {
+		t.Error(err)
+	}
 	<-done
 }
