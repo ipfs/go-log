@@ -122,3 +122,35 @@ func TestLogToFile(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestLogLabels(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to open pipe: %v", err)
+	}
+
+	stderr := os.Stderr
+	os.Stderr = w
+	defer func() {
+		os.Stderr = stderr
+	}()
+
+	// set the go-log labels env var
+	os.Setenv(envLoggingLabels, "app=example_app,dc=sjc-1")
+	SetupLogging(configFromEnv())
+
+	log := getLogger("test")
+
+	log.Error("scooby")
+	w.Close()
+
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	t.Log(buf.String())
+	if !strings.Contains(buf.String(), "{\"app\": \"example_app\", \"dc\": \"sjc-1\"}") {
+		t.Errorf("got %q, wanted it to contain log output", buf.String())
+	}
+}
