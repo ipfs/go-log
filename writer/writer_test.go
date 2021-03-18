@@ -53,15 +53,15 @@ func TestMirrorWriterHang(t *testing.T) {
 		buf := make([]byte, 10)
 		n, err := pr.Read(buf)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 
 		if n != len(msg) {
-			t.Fatal("read wrong amount")
+			t.Error("read wrong amount")
 		}
 
 		if string(buf[:n]) != msg {
-			t.Fatal("didnt read right content")
+			t.Error("didnt read right content")
 		}
 
 		done <- struct{}{}
