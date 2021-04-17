@@ -30,9 +30,9 @@ const (
 	envLoggingFmt = "GOLOG_LOG_FMT"
 
 	envLoggingFile = "GOLOG_FILE" // /path/to/file
-	envLoggingURL = "GOLOG_URL" // url that will be processed by sink in the zap
+	envLoggingURL  = "GOLOG_URL"  // url that will be processed by sink in the zap
 
-	envLoggingOutput = "GOLOG_OUTPUT" // possible values: stdout|stderr|file combine multiple values with '+'
+	envLoggingOutput = "GOLOG_OUTPUT"     // possible values: stdout|stderr|file combine multiple values with '+'
 	envLoggingLabels = "GOLOG_LOG_LABELS" // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
 )
 
@@ -48,8 +48,11 @@ type Config struct {
 	// Format overrides the format of the log output. Defaults to ColorizedOutput
 	Format LogFormat
 
-	// Level is the minimum enabled logging level.
+	// Level is the default minimum enabled logging level.
 	Level LogLevel
+
+	// SubsystemLevels are the default levels per-subsystem. When unspecified, defaults to Level.
+	SubsystemLevels map[string]LogLevel
 
 	// Stderr indicates whether logs should be written to stderr.
 	Stderr bool
@@ -139,6 +142,14 @@ func SetupLogging(cfg Config) {
 	primaryCore = newPrimaryCore
 
 	setAllLoggers(defaultLevel)
+
+	for name, level := range cfg.SubsystemLevels {
+		if leveler, ok := levels[name]; ok {
+			leveler.SetLevel(zapcore.Level(level))
+		} else {
+			levels[name] = zap.NewAtomicLevelAt(zapcore.Level(level))
+		}
+	}
 }
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
@@ -228,10 +239,14 @@ func getLogger(name string) *zap.SugaredLogger {
 	defer loggerMutex.Unlock()
 	log, ok := loggers[name]
 	if !ok {
-		levels[name] = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
+		level, ok := levels[name]
+		if !ok {
+			level = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
+			levels[name] = level
+		}
 		log = zap.New(loggerCore).
 			WithOptions(
-				zap.IncreaseLevel(levels[name]),
+				zap.IncreaseLevel(level),
 				zap.AddCaller(),
 			).
 			Named(name).
@@ -246,10 +261,11 @@ func getLogger(name string) *zap.SugaredLogger {
 // configFromEnv returns a Config with defaults populated using environment variables.
 func configFromEnv() Config {
 	cfg := Config{
-		Format: ColorizedOutput,
-		Stderr: true,
-		Level:  LevelError,
-		Labels: map[string]string{},
+		Format:          ColorizedOutput,
+		Stderr:          true,
+		Level:           LevelError,
+		SubsystemLevels: map[string]LogLevel{},
+		Labels:          map[string]string{},
 	}
 
 	format := os.Getenv(envLoggingFmt)
@@ -269,10 +285,19 @@ func configFromEnv() Config {
 		lvl = os.Getenv(envIPFSLogging)
 	}
 	if lvl != "" {
-		var err error
-		cfg.Level, err = LevelFromString(lvl)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error setting log levels: %s\n", err)
+		for _, kvs := range strings.Split(lvl, ",") {
+			kv := strings.SplitN(kvs, "=", 2)
+			lvl, err := LevelFromString(kv[len(kv)-1])
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error setting log level %q: %s\n", kvs, err)
+				continue
+			}
+			switch len(kv) {
+			case 1:
+				cfg.Level = lvl
+			case 2:
+				cfg.SubsystemLevels[kv[0]] = lvl
+			}
 		}
 	}
 
