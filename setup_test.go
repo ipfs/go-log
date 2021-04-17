@@ -139,7 +139,7 @@ func TestLogLabels(t *testing.T) {
 	}()
 
 	// set the go-log labels env var
-	os.Setenv(envLoggingLabels, "app=example_app,dc=sjc-1,foobar") // foobar to ensure we don't panic on bad input.
+	os.Setenv(envLoggingLabels, "dc=sjc-1,foobar") // foobar to ensure we don't panic on bad input.
 	defer os.Unsetenv(envLoggingLabels)
 	SetupLogging(configFromEnv())
 
@@ -154,7 +154,7 @@ func TestLogLabels(t *testing.T) {
 	}
 
 	t.Log(buf.String())
-	if !strings.Contains(buf.String(), "{\"app\": \"example_app\", \"dc\": \"sjc-1\"}") {
+	if !strings.Contains(buf.String(), "{\"dc\": \"sjc-1\"}") {
 		t.Errorf("got %q, wanted it to contain log output", buf.String())
 	}
 }
