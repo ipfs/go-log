@@ -136,7 +136,7 @@ func TestLogLabels(t *testing.T) {
 	}()
 
 	// set the go-log labels env var
-	os.Setenv(envLoggingLabels, "app=example_app,dc=sjc-1")
+	os.Setenv(envLoggingLabels, "app=example_app,dc=sjc-1,foobar") // foobar to ensure we don't panic on bad input.
 	SetupLogging(configFromEnv())
 
 	log := getLogger("test")

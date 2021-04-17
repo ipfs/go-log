@@ -308,6 +308,10 @@ func configFromEnv() Config {
 		labelKVs := strings.Split(labels, ",")
 		for _, label := range labelKVs {
 			kv := strings.Split(label, "=")
+			if len(kv) != 2 {
+				fmt.Fprint(os.Stderr, "invalid label k=v: ", label)
+				continue
+			}
 			cfg.Labels[kv[0]] = kv[1]
 		}
 	}
