@@ -60,9 +60,11 @@ func TestLogToFileAndStderr(t *testing.T) {
 	defer os.Remove(logfile.Name())
 
 	os.Setenv(envLoggingFile, logfile.Name())
+	defer os.Unsetenv(envLoggingFile)
 
 	// set log output env var
 	os.Setenv(envLoggingOutput, "file+stderr")
+	defer os.Unsetenv(envLoggingOutput)
 
 	SetupLogging(configFromEnv())
 
@@ -102,6 +104,7 @@ func TestLogToFile(t *testing.T) {
 
 	// set the go-log file env var
 	os.Setenv(envLoggingFile, logfile.Name())
+	defer os.Unsetenv(envLoggingFile)
 
 	SetupLogging(configFromEnv())
 
@@ -137,6 +140,7 @@ func TestLogLabels(t *testing.T) {
 
 	// set the go-log labels env var
 	os.Setenv(envLoggingLabels, "app=example_app,dc=sjc-1,foobar") // foobar to ensure we don't panic on bad input.
+	defer os.Unsetenv(envLoggingLabels)
 	SetupLogging(configFromEnv())
 
 	log := getLogger("test")
