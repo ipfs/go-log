@@ -71,7 +71,7 @@ type Config struct {
 }
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
-var ErrNoSuchLogger = errors.New("Error: No such logger")
+var ErrNoSuchLogger = errors.New("error: No such logger")
 
 var loggerMutex sync.RWMutex // guards access to global logger state
 
