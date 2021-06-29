@@ -134,13 +134,7 @@ func SetupLogging(cfg Config) {
 		newPrimaryCore = newPrimaryCore.With([]zap.Field{zap.String(k, v)})
 	}
 
-	if primaryCore != nil {
-		loggerCore.ReplaceCore(primaryCore, newPrimaryCore)
-	} else {
-		loggerCore.AddCore(newPrimaryCore)
-	}
-	primaryCore = newPrimaryCore
-
+	setPrimaryCore(newPrimaryCore)
 	setAllLoggers(defaultLevel)
 
 	for name, level := range cfg.SubsystemLevels {
@@ -150,6 +144,24 @@ func SetupLogging(cfg Config) {
 			levels[name] = zap.NewAtomicLevelAt(zapcore.Level(level))
 		}
 	}
+}
+
+// SetPrimaryCore changes the primary logging core. If the SetupLogging was
+// called then the previously configured core will be replaced.
+func SetPrimaryCore(core zapcore.Core) {
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+
+	setPrimaryCore(core)
+}
+
+func setPrimaryCore(core zapcore.Core) {
+	if primaryCore != nil {
+		loggerCore.ReplaceCore(primaryCore, core)
+	} else {
+		loggerCore.AddCore(core)
+	}
+	primaryCore = core
 }
 
 // SetDebugLogging calls SetAllLoggers with logging.DEBUG
