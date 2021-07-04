@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -285,11 +286,18 @@ func configFromEnv() Config {
 		format = os.Getenv(envIPFSLoggingFmt)
 	}
 
+	var noExplicitFormat bool
+
 	switch format {
 	case "nocolor":
 		cfg.Format = PlaintextOutput
 	case "json":
 		cfg.Format = JSONOutput
+	default:
+		if format != "" {
+			fmt.Fprintf(os.Stderr, "ignoring unrecognized log format '%s'\n", format)
+		}
+		noExplicitFormat = true
 	}
 
 	lvl := os.Getenv(envLogging)
@@ -340,6 +348,12 @@ func configFromEnv() Config {
 		}
 	}
 
+	if noExplicitFormat &&
+		(!cfg.Stdout || !isTerm(os.Stdout)) &&
+		(!cfg.Stderr || !isTerm(os.Stderr)) {
+		cfg.Format = PlaintextOutput
+	}
+
 	labels := os.Getenv(envLoggingLabels)
 	if labels != "" {
 		labelKVs := strings.Split(labels, ",")
@@ -354,4 +368,8 @@ func configFromEnv() Config {
 	}
 
 	return cfg
+}
+
+func isTerm(f *os.File) bool {
+	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 }
