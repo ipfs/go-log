@@ -289,6 +289,8 @@ func configFromEnv() Config {
 	var noExplicitFormat bool
 
 	switch format {
+	case "color":
+		cfg.Format = ColorizedOutput
 	case "nocolor":
 		cfg.Format = PlaintextOutput
 	case "json":
