@@ -350,9 +350,13 @@ func configFromEnv() Config {
 		}
 	}
 
+	// Check that neither of the requested Std* nor the file are TTYs
+	// At this stage (configFromEnv) we do not have a uniform list to examine yet
 	if noExplicitFormat &&
-		(!cfg.Stdout || !isTerm(os.Stdout)) &&
-		(!cfg.Stderr || !isTerm(os.Stderr)) {
+		!(cfg.Stdout && isTerm(os.Stdout)) &&
+		!(cfg.Stderr && isTerm(os.Stderr)) &&
+		// check this last: expensive
+		!(cfg.File != "" && pathIsTerm(cfg.File)) {
 		cfg.Format = PlaintextOutput
 	}
 
@@ -374,4 +378,13 @@ func configFromEnv() Config {
 
 func isTerm(f *os.File) bool {
 	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+}
+
+func pathIsTerm(p string) bool {
+	// !!!no!!! O_CREAT, if we fail - we fail
+	f, err := os.OpenFile(p, os.O_WRONLY, 0)
+	if f != nil {
+		defer f.Close() // nolint:errcheck
+	}
+	return err == nil && isTerm(f)
 }
