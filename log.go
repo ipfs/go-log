@@ -75,10 +75,10 @@ func FormatRFC3339(t time.Time) string {
 	return t.UTC().Format(time.RFC3339Nano)
 }
 
-func WithStacktrace(l *ZapEventLogger) *ZapEventLogger {
+func WithStacktrace(l *ZapEventLogger, level LogLevel) *ZapEventLogger {
 	copyLogger := *l
 	copyLogger.SugaredLogger = *copyLogger.SugaredLogger.Desugar().
-		WithOptions(zap.AddStacktrace(zapcore.InfoLevel)).Sugar()
+		WithOptions(zap.AddStacktrace(zapcore.Level(level))).Sugar()
 	copyLogger.skipLogger = *copyLogger.SugaredLogger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar()
 	return &copyLogger
 }
