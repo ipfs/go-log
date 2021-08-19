@@ -29,9 +29,9 @@ Levels may be set for all loggers:
 
 ```go
 lvl, err := logging.LevelFromString("error")
-  if err != nil {
-    panic(err)
-  }
+if err != nil {
+	panic(err)
+}
 logging.SetAllLoggers(lvl)
 ```
 
@@ -39,9 +39,9 @@ or individually:
 
 ```go
 lvl, err := logging.LevelFromString("error")
-  if err != nil {
-    panic(err)
-  }
+if err != nil {
+	panic(err)
+}
 logging.SetLogLevel("foo", "info")
 ```
 
