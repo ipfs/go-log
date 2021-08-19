@@ -38,11 +38,19 @@ logging.SetAllLoggers(lvl)
 or individually:
 
 ```go
-lvl, err := logging.LevelFromString("error")
+err := logging.SetLogLevel("net:pubsub", "info")
 if err != nil {
 	panic(err)
 }
-logging.SetLogLevel("foo", "info")
+```
+
+or by regular expression:
+
+```go
+err := logging.SetLogLevelRegex("net:.*", "info")
+if err != nil {
+	panic(err)
+}
 ```
 
 ### Environment Variables
