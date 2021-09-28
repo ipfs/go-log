@@ -7,6 +7,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func TestGetLoggerDefault(t *testing.T) {
@@ -239,4 +242,19 @@ func TestCustomCore(t *testing.T) {
 	if !strings.Contains(buf2.String(), "doo") {
 		t.Errorf("got %q, wanted it to contain log output", buf2.String())
 	}
+}
+
+func TestTeeCore(t *testing.T) {
+	// configure to use a tee logger
+	tee := zap.New(zapcore.NewTee(
+		zap.NewNop().Core(),
+		zap.NewNop().Core(),
+	), zap.AddCaller())
+	SetPrimaryCore(tee.Core())
+	log := getLogger("test")
+	log.Error("scooby")
+
+	// replaces the tee logger with a simple one
+	SetPrimaryCore(zap.NewNop().Core())
+	log.Error("doo")
 }
