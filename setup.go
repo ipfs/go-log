@@ -347,6 +347,7 @@ func configFromEnv() Config {
 		switch opt {
 		case "stdout":
 			cfg.Stdout = true
+			cfg.Stderr = false
 		case "stderr":
 			cfg.Stderr = true
 		case "file":
