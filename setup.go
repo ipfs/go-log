@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -347,6 +349,11 @@ func configFromEnv() Config {
 		switch opt {
 		case "stdout":
 			cfg.Stdout = true
+			if slices.Contains(outputOptions, "stderr") {
+				cfg.Stderr = true
+			} else {
+				cfg.Stderr = false
+			}
 		case "stderr":
 			cfg.Stderr = true
 		case "file":
