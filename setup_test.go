@@ -3,7 +3,6 @@ package log
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -55,7 +54,7 @@ func TestLogToFileAndStderr(t *testing.T) {
 	}()
 
 	// setup file
-	logfile, err := ioutil.TempFile("", "go-log-test")
+	logfile, err := os.CreateTemp("", "go-log-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +84,7 @@ func TestLogToFileAndStderr(t *testing.T) {
 		t.Errorf("got %q, wanted it to contain log output", buf.String())
 	}
 
-	content, err := ioutil.ReadFile(logfile.Name())
+	content, err := os.ReadFile(logfile.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +97,7 @@ func TestLogToFileAndStderr(t *testing.T) {
 
 func TestLogToFile(t *testing.T) {
 	// get tmp log file
-	logfile, err := ioutil.TempFile("", "go-log-test")
+	logfile, err := os.CreateTemp("", "go-log-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +116,7 @@ func TestLogToFile(t *testing.T) {
 	log.Error(want)
 
 	// read log file and check contents
-	content, err := ioutil.ReadFile(logfile.Name())
+	content, err := os.ReadFile(logfile.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
