@@ -92,3 +92,29 @@ func WithSkip(l *ZapEventLogger, skip int) *ZapEventLogger {
 	copyLogger.skipLogger = *copyLogger.SugaredLogger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar()
 	return &copyLogger
 }
+
+func NewLoggerWithLevel(name string, level string) *ZapEventLogger {
+	log := Logger(name)
+	cfg := configFromEnv()
+	if l, ok := cfg.SubsystemLevels[name]; ok {
+		levels[name].SetLevel(zapcore.Level(l))
+	} else {
+		if err := SetLogLevel(name, level); err != nil {
+			panic(err)
+		}
+	}
+
+	return log
+}
+
+// return an logger with info level
+func NewLogger(name string) *ZapEventLogger {
+	l := Logger(name)
+	cfg := configFromEnv()
+	if lvl, ok := cfg.SubsystemLevels[name]; ok {
+		levels[name].SetLevel(zapcore.Level(lvl))
+	} else {
+		SetLogLevel(name, "INFO")
+	}
+	return l
+}
