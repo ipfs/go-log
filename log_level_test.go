@@ -37,6 +37,7 @@ func TestLogLevel(t *testing.T) {
 		}
 	}()
 	logger.Debugw("foo")
+	logger.Sync()
 	if err := SetLogLevel(subsystem, "debug"); err != nil {
 		t.Error(err)
 	}
