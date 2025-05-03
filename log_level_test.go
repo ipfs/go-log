@@ -9,6 +9,7 @@ import (
 func TestLogLevel(t *testing.T) {
 	const subsystem = "log-level-test"
 	logger := Logger(subsystem)
+	SetAllLoggers(LevelError)
 	reader := NewPipeReader()
 	done := make(chan struct{})
 	go func() {
@@ -37,7 +38,6 @@ func TestLogLevel(t *testing.T) {
 		}
 	}()
 	logger.Debugw("foo")
-	logger.Sync()
 	if err := SetLogLevel(subsystem, "debug"); err != nil {
 		t.Error(err)
 	}
