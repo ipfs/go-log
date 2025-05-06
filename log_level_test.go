@@ -2,6 +2,8 @@ package log
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"testing"
 )
@@ -9,51 +11,66 @@ import (
 func TestLogLevel(t *testing.T) {
 	const subsystem = "log-level-test"
 	logger := Logger(subsystem)
-	reader := NewPipeReader()
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
+	readLog := func(reader *PipeReader, errCh chan error) {
 		decoder := json.NewDecoder(reader)
-		for {
-			var entry struct {
-				Message string `json:"msg"`
-				Caller  string `json:"caller"`
-			}
-			err := decoder.Decode(&entry)
-			switch err {
-			default:
-				t.Error(err)
-				return
-			case io.EOF:
-				return
-			case nil:
-			}
-			if entry.Message == "sync" {
-				continue
-			}
-			if entry.Message != "bar" {
-				t.Errorf("unexpected message: %s", entry.Message)
-			}
-			if entry.Caller == "" {
-				t.Errorf("no caller in log entry")
-			}
+		var entry struct {
+			Message string `json:"msg"`
+			Caller  string `json:"caller"`
 		}
-	}()
-	if err := SetLogLevel(subsystem, "error"); err != nil {
+		err := decoder.Decode(&entry)
+		switch err {
+		default:
+			errCh <- err
+			return
+		case io.EOF:
+			errCh <- nil
+			return
+		case nil:
+		}
+		if entry.Message != "bar" {
+			errCh <- fmt.Errorf("unexpected message: %s", entry.Message)
+			return
+		}
+		if entry.Caller == "" {
+			errCh <- errors.New("no caller in log entry")
+			return
+		}
+		errCh <- nil
+	}
+
+	err := SetLogLevel(subsystem, "error")
+	if err != nil {
 		t.Error(err)
 	}
-	logger.Error("sync")
-
+	reader := NewPipeReader()
+	errCh := make(chan error, 1)
+	go readLog(reader, errCh)
 	logger.Debug("foo")
-	if err := SetLogLevel(subsystem, "debug"); err != nil {
+	_ = logger.Sync()
+	if err = reader.Close(); err != nil {
 		t.Error(err)
 	}
-	logger.Error("sync")
+	if err = <-errCh; err != nil {
+		t.Error(err)
+	}
 
+	if err = SetLogLevel(subsystem, "debug"); err != nil {
+		t.Error(err)
+	}
+	reader = NewPipeReader()
+	go readLog(reader, errCh)
 	logger.Debug("bar")
-	SetAllLoggers(LevelInfo)
-	logger.Error("sync")
+	_ = logger.Sync()
+	if err = reader.Close(); err != nil {
+		t.Error(err)
+	}
+	if err = <-errCh; err != nil {
+		t.Error(err)
+	}
 
+	SetAllLoggers(LevelInfo)
+	reader = NewPipeReader()
+	go readLog(reader, errCh)
 	logger.Debug("baz")
 	// ignore the error because
 	// https://github.com/uber-go/zap/issues/880
@@ -61,5 +78,7 @@ func TestLogLevel(t *testing.T) {
 	if err := reader.Close(); err != nil {
 		t.Error(err)
 	}
-	<-done
+	if err = <-errCh; err != nil {
+		t.Error(err)
+	}
 }
