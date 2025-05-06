@@ -28,6 +28,9 @@ func TestLogLevel(t *testing.T) {
 				return
 			case nil:
 			}
+			if entry.Message == "sync" {
+				continue
+			}
 			if entry.Message != "bar" {
 				t.Errorf("unexpected message: %s", entry.Message)
 			}
@@ -36,13 +39,22 @@ func TestLogLevel(t *testing.T) {
 			}
 		}
 	}()
-	logger.Debugw("foo")
+	if err := SetLogLevel(subsystem, "error"); err != nil {
+		t.Error(err)
+	}
+	logger.Error("sync")
+
+	logger.Debug("foo")
 	if err := SetLogLevel(subsystem, "debug"); err != nil {
 		t.Error(err)
 	}
-	logger.Debugw("bar")
+	logger.Error("sync")
+
+	logger.Debug("bar")
 	SetAllLoggers(LevelInfo)
-	logger.Debugw("baz")
+	logger.Error("sync")
+
+	logger.Debug("baz")
 	// ignore the error because
 	// https://github.com/uber-go/zap/issues/880
 	_ = logger.Sync()
