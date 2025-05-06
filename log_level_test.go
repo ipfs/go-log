@@ -9,11 +9,10 @@ import (
 func TestLogLevel(t *testing.T) {
 	const subsystem = "log-level-test"
 	logger := Logger(subsystem)
+	reader := NewPipeReader()
 	done := make(chan struct{})
-	readLog := func(reader *PipeReader) {
-		defer func() {
-			done <- struct{}{}
-		}()
+	go func() {
+		defer close(done)
 		decoder := json.NewDecoder(reader)
 		for {
 			var entry struct {
@@ -36,31 +35,13 @@ func TestLogLevel(t *testing.T) {
 				t.Errorf("no caller in log entry")
 			}
 		}
-	}
-	reader := NewPipeReader()
-	go readLog(reader)
+	}()
 	logger.Debugw("foo")
-	_ = logger.Sync()
-	if err := reader.Close(); err != nil {
-		t.Error(err)
-	}
-	<-done
-
 	if err := SetLogLevel(subsystem, "debug"); err != nil {
 		t.Error(err)
 	}
-	reader = NewPipeReader()
-	go readLog(reader)
 	logger.Debugw("bar")
-	_ = logger.Sync()
-	if err := reader.Close(); err != nil {
-		t.Error(err)
-	}
-	<-done
-
 	SetAllLoggers(LevelInfo)
-	reader = NewPipeReader()
-	go readLog(reader)
 	logger.Debugw("baz")
 	// ignore the error because
 	// https://github.com/uber-go/zap/issues/880
