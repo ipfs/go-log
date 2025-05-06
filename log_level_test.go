@@ -9,9 +9,6 @@ import (
 func TestLogLevel(t *testing.T) {
 	const subsystem = "log-level-test"
 	logger := Logger(subsystem)
-	if err := SetLogLevel(subsystem, "info"); err != nil {
-		t.Error(err)
-	}
 	reader := NewPipeReader()
 	done := make(chan struct{})
 	go func() {
