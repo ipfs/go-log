@@ -257,3 +257,101 @@ func TestTeeCore(t *testing.T) {
 	SetPrimaryCore(zap.NewNop().Core())
 	log.Error("doo")
 }
+
+func TestLogToStderrAndStdout(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to open pipe: %v", err)
+	}
+
+	r2, w2, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to open pipe: %v", err)
+	}
+
+	stderr := os.Stderr
+	stdout := os.Stdout
+	os.Stderr = w
+	os.Stdout = w2
+	defer func() {
+		os.Stderr = stderr
+		os.Stdout = stdout
+	}()
+
+	os.Setenv(envLoggingOutput, "stdout+stderr")
+	defer os.Unsetenv(envLoggingOutput)
+
+	SetupLogging(configFromEnv())
+
+	log := getLogger("test")
+
+	want := "scooby"
+	log.Error(want)
+	w.Close()
+	w2.Close()
+
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("got %q, wanted it to contain log output", buf.String())
+	}
+
+	buf.Reset()
+	if _, err := io.Copy(buf, r2); err != nil && err != io.ErrClosedPipe {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("got %q, wanted it to contain log output", buf.String())
+	}
+}
+
+func TestLogToStdoutOnly(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to open pipe: %v", err)
+	}
+
+	r2, w2, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to open pipe: %v", err)
+	}
+
+	stderr := os.Stderr
+	stdout := os.Stdout
+	os.Stderr = w
+	os.Stdout = w2
+	defer func() {
+		os.Stderr = stderr
+		os.Stdout = stdout
+	}()
+
+	os.Setenv(envLoggingOutput, "stdout")
+	defer os.Unsetenv(envLoggingOutput)
+
+	SetupLogging(configFromEnv())
+
+	log := getLogger("test")
+
+	want := "scooby"
+	log.Error(want)
+	w.Close()
+	w2.Close()
+
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("Should not have read anything from stderr")
+	}
+
+	buf.Reset()
+	if _, err := io.Copy(buf, r2); err != nil && err != io.ErrClosedPipe {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), want) {
+		t.Errorf("got %q, wanted it to contain log output", buf.String())
+	}
+}
