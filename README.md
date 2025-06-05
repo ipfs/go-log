@@ -122,6 +122,16 @@ pairs. For example, the following add `{"app": "example_app", "dc": "sjc-1"}` to
 export GOLOG_LOG_LABELS="app=example_app,dc=sjc-1"
 ```
 
+#### `GOLOG_LOG_CALLER_FORMAT`
+
+Specifies the file line format.
+
+- `full` Serializes a caller in /full/path/to/package/file:line.
+- `short` serializes a caller in package/file:line format, trimming all but the final directory from the full path.
+```bash
+export GOLOG_LOG_CALLER_FORMAT="full"
+```
+
 ## Contribute
 
 Feel free to join in. All welcome. Open an [issue](https://github.com/ipfs/go-log/issues)!
