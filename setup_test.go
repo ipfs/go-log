@@ -275,7 +275,9 @@ func clearLoggerState() {
 func TestGetDefaultLevel(t *testing.T) {
 	originalConfig := GetConfig()
 	defer SetupLogging(originalConfig)
-	defer clearLoggerState()
+
+	// Clear any state from previous tests first
+	clearLoggerState()
 
 	testCases := []LogLevel{LevelDebug, LevelInfo, LevelWarn, LevelError}
 
@@ -332,7 +334,9 @@ func TestGetDefaultLevel(t *testing.T) {
 func TestGetAllLogLevels(t *testing.T) {
 	originalConfig := GetConfig()
 	defer SetupLogging(originalConfig)
-	defer clearLoggerState()
+
+	// Clear any state from previous tests first
+	clearLoggerState()
 
 	SetupLogging(Config{Level: LevelWarn, Stderr: true})
 	base := GetAllLogLevels()
