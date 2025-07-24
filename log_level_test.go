@@ -8,6 +8,17 @@ import (
 
 func TestLogLevel(t *testing.T) {
 	const subsystem = "log-level-test"
+
+	// Save original config and restore after test
+	originalConfig := GetConfig()
+	defer SetupLogging(originalConfig)
+
+	// Reset to a known state with error level default
+	SetupLogging(Config{
+		Level:  LevelError,
+		Stderr: true,
+	})
+
 	logger := Logger(subsystem)
 	reader := NewPipeReader()
 	done := make(chan struct{})
