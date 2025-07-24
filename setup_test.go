@@ -258,6 +258,147 @@ func TestTeeCore(t *testing.T) {
 	log.Error("doo")
 }
 
+// Helper function to clear logger state between tests
+func clearLoggerState() {
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+
+	// Clear all loggers and levels
+	for k := range loggers {
+		delete(loggers, k)
+	}
+	for k := range levels {
+		delete(levels, k)
+	}
+}
+
+func TestGetDefaultLevel(t *testing.T) {
+	originalConfig := GetConfig()
+	defer SetupLogging(originalConfig)
+	defer clearLoggerState()
+
+	testCases := []LogLevel{LevelDebug, LevelInfo, LevelWarn, LevelError}
+
+	for _, expected := range testCases {
+		SetupLogging(Config{Level: expected, Stderr: true})
+
+		// no args
+		lvl, err := GetLogLevel()
+		if err != nil {
+			t.Errorf("GetLogLevel() returned error: %v", err)
+		}
+		if lvl != expected {
+			t.Errorf("GetLogLevel() = %v, want %v", lvl, expected)
+		}
+
+		// explicit "*"
+		lvl, err = GetLogLevel("*")
+		if err != nil {
+			t.Errorf(`GetLogLevel("*") returned error: %v`, err)
+		}
+		if lvl != expected {
+			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, expected)
+		}
+
+		// empty string
+		lvl, err = GetLogLevel("")
+		if err != nil {
+			t.Errorf(`GetLogLevel("") returned error: %v`, err)
+		}
+		if lvl != expected {
+			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, expected)
+		}
+
+		// multi-arg test
+		_ = Logger("svc")
+		if err := SetLogLevel("svc", "info"); err != nil {
+			t.Fatalf("SetLogLevel(svc) failed: %v", err)
+		}
+		// multi‑arg is ignored beyond the first
+		lvl1, err := GetLogLevel("svc", "ignored")
+		if err != nil {
+			t.Errorf("GetLogLevel(\"svc\", \"ignored\") error: %v", err)
+		}
+		lvl2, err := GetLogLevel("svc")
+		if err != nil {
+			t.Errorf("GetLogLevel(\"svc\") error: %v", err)
+		}
+		if lvl1 != lvl2 {
+			t.Errorf("multi‑arg mismatch: GetLogLevel(\"svc\",\"ignored\")=%v, GetLogLevel(\"svc\")=%v", lvl1, lvl2)
+		}
+	}
+}
+
+func TestGetAllLogLevels(t *testing.T) {
+	originalConfig := GetConfig()
+	defer SetupLogging(originalConfig)
+	defer clearLoggerState()
+
+	SetupLogging(Config{Level: LevelWarn, Stderr: true})
+	base := GetAllLogLevels()
+
+	if len(base) != 1 {
+		t.Errorf("baseline GetAllLogLevels() length = %d; want 1", len(base))
+	}
+	if base["*"] != LevelWarn {
+		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], LevelWarn)
+	}
+
+	expected := map[string]LogLevel{
+		"test1": LevelDebug,
+		"test2": LevelInfo,
+		"test3": LevelWarn,
+	}
+	SetupLogging(Config{
+		Level:           LevelError,
+		SubsystemLevels: expected,
+		Stderr:          true,
+	})
+
+	all := GetAllLogLevels()
+
+	if all["*"] != LevelError {
+		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], LevelError)
+	}
+	for name, want := range expected {
+		got, ok := all[name]
+		if !ok {
+			t.Errorf("missing key %q in GetAllLogLevels()", name)
+			continue
+		}
+		if got != want {
+			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, want)
+		}
+	}
+
+	// dynamic logger test
+	_ = Logger("dynamic")
+	if err := SetLogLevel("dynamic", "fatal"); err != nil {
+		t.Fatalf("SetLogLevel(dynamic) failed: %v", err)
+	}
+
+	all = GetAllLogLevels()
+	if lvl, ok := all["dynamic"]; !ok {
+		t.Error(`missing "dynamic" key after creation`)
+	} else if lvl != LevelFatal {
+		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, LevelFatal)
+	}
+
+	// ensure immutability
+	snapshot := GetAllLogLevels()
+	snapshot["*"] = LevelDebug
+	snapshot["newkey"] = LevelInfo
+
+	// ensure original state unchanged
+	fresh := GetAllLogLevels()
+	if fresh["*"] != LevelError {
+		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], LevelError)
+	}
+	if _, exists := fresh["newkey"]; exists {
+		t.Error(`immutable check failed: "newkey" should not leak into real map`)
+	}
+}
+
 func TestLogToStderrAndStdout(t *testing.T) {
 	r, w, err := os.Pipe()
 	if err != nil {

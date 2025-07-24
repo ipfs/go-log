@@ -257,6 +257,46 @@ func GetSubsystems() []string {
 	return subs
 }
 
+// GetLogLevel returns the current log level for a given subsystem.
+// If you call it with no args, it returns the global (default) level.
+// Passing name="*" explicitly also returns the global level.
+func GetLogLevel(names ...string) (LogLevel, error) {
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
+
+	key := "*"
+	if len(names) > 0 && names[0] != "" {
+		key = names[0]
+	}
+
+	if key == "*" {
+		return defaultLevel, nil
+	}
+	if lvl, ok := levels[key]; ok {
+		return LogLevel(lvl.Level()), nil
+	}
+	return 0, ErrNoSuchLogger
+}
+
+// GetAllLogLevels returns a map of all current log levels for all subsystems.
+// The map includes a special "*" key that represents the default (global) level.
+func GetAllLogLevels() map[string]LogLevel {
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
+
+	result := make(map[string]LogLevel)
+
+	// Add the default level with "*" key
+	result["*"] = defaultLevel
+
+	// Add all subsystem levels
+	for name, level := range levels {
+		result[name] = LogLevel(level.Level())
+	}
+
+	return result
+}
+
 func getLogger(name string) *zap.SugaredLogger {
 	loggerMutex.Lock()
 	defer loggerMutex.Unlock()
