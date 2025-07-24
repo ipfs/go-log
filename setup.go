@@ -88,6 +88,11 @@ var primaryFormat LogFormat = ColorizedOutput
 // defaultLevel is the default log level
 var defaultLevel LogLevel = LevelError
 
+// globalLevel is the current global log level
+// New loggers will be set to `defaultLevel` by default but the current global level is currently tracked separately.
+// QUESTION: Do we want to use defaultLevel and override what new loggers will be set to?
+var globalLevel LogLevel = LevelError
+
 // primaryCore is the primary logging core
 var primaryCore zapcore.Core
 
@@ -112,6 +117,7 @@ func SetupLogging(cfg Config) {
 
 	primaryFormat = cfg.Format
 	defaultLevel = cfg.Level
+	globalLevel = cfg.Level
 
 	outputPaths := []string{}
 
@@ -205,6 +211,8 @@ func SetLogLevel(name, level string) error {
 	// wildcard, change all
 	if name == "*" {
 		SetAllLoggers(lvl)
+		// QUESTION: Do we want to use defaultLevel and override what new loggers will be set to?
+		globalLevel = lvl
 		return nil
 	}
 
@@ -292,7 +300,7 @@ func GetLogLevel(names ...string) (string, error) {
 	}
 
 	if key == "*" {
-		return logLevelToString(defaultLevel), nil
+		return logLevelToString(globalLevel), nil
 	}
 	if lvl, ok := levels[key]; ok {
 		return logLevelToString(LogLevel(lvl.Level())), nil
@@ -309,7 +317,7 @@ func GetAllLogLevels() map[string]string {
 	result := make(map[string]string)
 
 	// Add the default level with "*" key
-	result["*"] = logLevelToString(defaultLevel)
+	result["*"] = logLevelToString(globalLevel)
 
 	// Add all subsystem levels
 	for name, level := range levels {
@@ -326,6 +334,7 @@ func getLogger(name string) *zap.SugaredLogger {
 	if !ok {
 		level, ok := levels[name]
 		if !ok {
+			// QUESTION: Do we want to use globalLevel and override what new loggers will be set to?
 			level = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
 			levels[name] = level
 		}
