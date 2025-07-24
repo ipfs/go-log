@@ -287,8 +287,8 @@ func TestGetDefaultLevel(t *testing.T) {
 		if err != nil {
 			t.Errorf("GetLogLevel() returned error: %v", err)
 		}
-		if lvl != expected {
-			t.Errorf("GetLogLevel() = %v, want %v", lvl, expected)
+		if lvl != logLevelToString(expected) {
+			t.Errorf("GetLogLevel() = %v, want %v", lvl, logLevelToString(expected))
 		}
 
 		// explicit "*"
@@ -296,8 +296,8 @@ func TestGetDefaultLevel(t *testing.T) {
 		if err != nil {
 			t.Errorf(`GetLogLevel("*") returned error: %v`, err)
 		}
-		if lvl != expected {
-			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, expected)
+		if lvl != logLevelToString(expected) {
+			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, logLevelToString(expected))
 		}
 
 		// empty string
@@ -305,8 +305,8 @@ func TestGetDefaultLevel(t *testing.T) {
 		if err != nil {
 			t.Errorf(`GetLogLevel("") returned error: %v`, err)
 		}
-		if lvl != expected {
-			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, expected)
+		if lvl != logLevelToString(expected) {
+			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, logLevelToString(expected))
 		}
 
 		// multi-arg test
@@ -340,8 +340,8 @@ func TestGetAllLogLevels(t *testing.T) {
 	if len(base) != 1 {
 		t.Errorf("baseline GetAllLogLevels() length = %d; want 1", len(base))
 	}
-	if base["*"] != LevelWarn {
-		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], LevelWarn)
+	if base["*"] != logLevelToString(LevelWarn) {
+		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], logLevelToString(LevelWarn))
 	}
 
 	expected := map[string]LogLevel{
@@ -357,8 +357,8 @@ func TestGetAllLogLevels(t *testing.T) {
 
 	all := GetAllLogLevels()
 
-	if all["*"] != LevelError {
-		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], LevelError)
+	if all["*"] != logLevelToString(LevelError) {
+		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], logLevelToString(LevelError))
 	}
 	for name, want := range expected {
 		got, ok := all[name]
@@ -366,8 +366,8 @@ func TestGetAllLogLevels(t *testing.T) {
 			t.Errorf("missing key %q in GetAllLogLevels()", name)
 			continue
 		}
-		if got != want {
-			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, want)
+		if got != logLevelToString(want) {
+			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, logLevelToString(want))
 		}
 	}
 
@@ -380,19 +380,19 @@ func TestGetAllLogLevels(t *testing.T) {
 	all = GetAllLogLevels()
 	if lvl, ok := all["dynamic"]; !ok {
 		t.Error(`missing "dynamic" key after creation`)
-	} else if lvl != LevelFatal {
-		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, LevelFatal)
+	} else if lvl != logLevelToString(LevelFatal) {
+		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, logLevelToString(LevelFatal))
 	}
 
 	// ensure immutability
 	snapshot := GetAllLogLevels()
-	snapshot["*"] = LevelDebug
-	snapshot["newkey"] = LevelInfo
+	snapshot["*"] = logLevelToString(LevelDebug)
+	snapshot["newkey"] = logLevelToString(LevelInfo)
 
 	// ensure original state unchanged
 	fresh := GetAllLogLevels()
-	if fresh["*"] != LevelError {
-		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], LevelError)
+	if fresh["*"] != logLevelToString(LevelError) {
+		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], logLevelToString(LevelError))
 	}
 	if _, exists := fresh["newkey"]; exists {
 		t.Error(`immutable check failed: "newkey" should not leak into real map`)

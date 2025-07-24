@@ -257,10 +257,32 @@ func GetSubsystems() []string {
 	return subs
 }
 
-// GetLogLevel returns the current log level for a given subsystem.
+// logLevelToString converts a LogLevel to its string representation
+func logLevelToString(level LogLevel) string {
+	switch level {
+	case LevelDebug:
+		return "debug"
+	case LevelInfo:
+		return "info"
+	case LevelWarn:
+		return "warn"
+	case LevelError:
+		return "error"
+	case LevelDPanic:
+		return "dpanic"
+	case LevelPanic:
+		return "panic"
+	case LevelFatal:
+		return "fatal"
+	default:
+		return fmt.Sprintf("unknown(%d)", int(level))
+	}
+}
+
+// GetLogLevel returns the current log level for a given subsystem as a string.
 // If you call it with no args, it returns the global (default) level.
 // Passing name="*" explicitly also returns the global level.
-func GetLogLevel(names ...string) (LogLevel, error) {
+func GetLogLevel(names ...string) (string, error) {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
 
@@ -270,28 +292,28 @@ func GetLogLevel(names ...string) (LogLevel, error) {
 	}
 
 	if key == "*" {
-		return defaultLevel, nil
+		return logLevelToString(defaultLevel), nil
 	}
 	if lvl, ok := levels[key]; ok {
-		return LogLevel(lvl.Level()), nil
+		return logLevelToString(LogLevel(lvl.Level())), nil
 	}
-	return 0, ErrNoSuchLogger
+	return "", ErrNoSuchLogger
 }
 
-// GetAllLogLevels returns a map of all current log levels for all subsystems.
+// GetAllLogLevels returns a map of all current log levels for all subsystems as strings.
 // The map includes a special "*" key that represents the default (global) level.
-func GetAllLogLevels() map[string]LogLevel {
+func GetAllLogLevels() map[string]string {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
 
-	result := make(map[string]LogLevel)
+	result := make(map[string]string)
 
 	// Add the default level with "*" key
-	result["*"] = defaultLevel
+	result["*"] = logLevelToString(defaultLevel)
 
 	// Add all subsystem levels
 	for name, level := range levels {
-		result[name] = LogLevel(level.Level())
+		result[name] = logLevelToString(LogLevel(level.Level()))
 	}
 
 	return result
