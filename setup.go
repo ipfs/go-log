@@ -292,7 +292,7 @@ func GetAllLogLevels() map[string]string {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
 
-	result := make(map[string]string, len(levels) + 1)
+	result := make(map[string]string, len(levels)+1)
 
 	// Add the default level with "*" key
 	result["*"] = logLevelToString(defaultLevel)
