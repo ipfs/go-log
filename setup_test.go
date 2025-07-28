@@ -260,16 +260,8 @@ func TestTeeCore(t *testing.T) {
 
 // Helper function to clear logger state between tests
 func clearLoggerState() {
-	loggerMutex.Lock()
-	defer loggerMutex.Unlock()
-
-	// Clear all loggers and levels
-	for k := range loggers {
-		delete(loggers, k)
-	}
-	for k := range levels {
-		delete(levels, k)
-	}
+	clear(loggers)
+	clear(levels)
 }
 
 func TestGetDefaultLevel(t *testing.T) {
