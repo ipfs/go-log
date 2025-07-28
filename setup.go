@@ -262,18 +262,13 @@ func GetSubsystems() []string {
 // GetLogLevel returns the current log level for a given subsystem as a string.
 // Passing name="*" or name="" returns the defaultLevel.
 func GetLogLevel(name string) (string, error) {
-	key := "*"
-	if name != "" {
-		key = name
-	}
-
-	if key == "*" {
+	if name == "*" || name == "" {
 		loggerMutex.RLock()
-		glevel := zapcore.Level(defaultLevel).String()
+		defLvl := defaultLevel
 		loggerMutex.RUnlock()
-		return glevel, nil
+		return zapcore.Level(defLvl).String(), nil
 	}
-	if lvl, ok := levels[key]; ok {
+	if lvl, ok := levels[name]; ok {
 		return zapcore.Level(LogLevel(lvl.Level())).String(), nil
 	}
 	return "", ErrNoSuchLogger
