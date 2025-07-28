@@ -276,8 +276,8 @@ func TestGetDefaultLevel(t *testing.T) {
 	for _, expected := range testCases {
 		SetupLogging(Config{Level: expected, Stderr: true})
 
-		// no args
-		lvl, err := GetLogLevel()
+		// empty string arg
+		lvl, err := GetLogLevel("")
 		if err != nil {
 			t.Errorf("GetLogLevel() returned error: %v", err)
 		} else if lvl != zapcore.Level(expected).String() {
@@ -298,23 +298,6 @@ func TestGetDefaultLevel(t *testing.T) {
 			t.Errorf(`GetLogLevel("") returned error: %v`, err)
 		} else if lvl != zapcore.Level(expected).String() {
 			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, zapcore.Level(expected).String())
-		}
-
-		// multi-arg test
-		_ = Logger("svc")
-		if err := SetLogLevel("svc", "info"); err != nil {
-			t.Fatalf("SetLogLevel(svc) failed: %v", err)
-		}
-		// multi‑arg is ignored beyond the first
-		lvl1, err := GetLogLevel("svc", "ignored")
-		if err != nil {
-			t.Errorf("GetLogLevel(\"svc\", \"ignored\") error: %v", err)
-		}
-		lvl2, err := GetLogLevel("svc")
-		if err != nil {
-			t.Errorf("GetLogLevel(\"svc\") error: %v", err)
-		} else if lvl1 != lvl2 {
-			t.Errorf("multi‑arg mismatch: GetLogLevel(\"svc\",\"ignored\")=%v, GetLogLevel(\"svc\")=%v", lvl1, lvl2)
 		}
 	}
 }

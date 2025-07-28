@@ -261,12 +261,11 @@ func GetSubsystems() []string {
 }
 
 // GetLogLevel returns the current log level for a given subsystem as a string.
-// If you call it with no args, it returns the defaultLevel.
-// Passing name="*" explicitly also returns the defaultLevel.
-func GetLogLevel(names ...string) (string, error) {
+// Passing name="*" or name="" returns the defaultLevel.
+func GetLogLevel(name string) (string, error) {
 	key := "*"
-	if len(names) > 0 && names[0] != "" {
-		key = names[0]
+	if name != "" {
+		key = name
 	}
 
 	if key == "*" {
