@@ -313,8 +313,7 @@ func TestGetDefaultLevel(t *testing.T) {
 		lvl2, err := GetLogLevel("svc")
 		if err != nil {
 			t.Errorf("GetLogLevel(\"svc\") error: %v", err)
-		}
-		if lvl1 != lvl2 {
+		} else if lvl1 != lvl2 {
 			t.Errorf("multi‑arg mismatch: GetLogLevel(\"svc\",\"ignored\")=%v, GetLogLevel(\"svc\")=%v", lvl1, lvl2)
 		}
 	}
