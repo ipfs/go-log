@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"testing"
-
-	"go.uber.org/zap/zapcore"
 )
 
 func TestLogLevel(t *testing.T) {
@@ -87,24 +85,24 @@ func TestGetDefaultLevel(t *testing.T) {
 		lvl, err := GetLogLevel("")
 		if err != nil {
 			t.Errorf("GetLogLevel() returned error: %v", err)
-		} else if lvl != zapcore.Level(expected).String() {
-			t.Errorf("GetLogLevel() = %v, want %v", lvl, zapcore.Level(expected).String())
+		} else if lvl != LevelName(expected) {
+			t.Errorf("GetLogLevel() = %v, want %v", lvl, LevelName(expected))
 		}
 
 		// explicit "*"
 		lvl, err = GetLogLevel("*")
 		if err != nil {
 			t.Errorf(`GetLogLevel("*") returned error: %v`, err)
-		} else if lvl != zapcore.Level(expected).String() {
-			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, zapcore.Level(expected).String())
+		} else if lvl != LevelName(expected) {
+			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, LevelName(expected))
 		}
 
 		// empty string
 		lvl, err = GetLogLevel("")
 		if err != nil {
 			t.Errorf(`GetLogLevel("") returned error: %v`, err)
-		} else if lvl != zapcore.Level(expected).String() {
-			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, zapcore.Level(expected).String())
+		} else if lvl != LevelName(expected) {
+			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, LevelName(expected))
 		}
 	}
 }
@@ -122,8 +120,8 @@ func TestGetAllLogLevels(t *testing.T) {
 	if len(base) != 1 {
 		t.Errorf("baseline GetAllLogLevels() length = %d; want 1", len(base))
 	}
-	if base["*"] != zapcore.Level(LevelWarn).String() {
-		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], zapcore.Level(LevelWarn).String())
+	if base["*"] != LevelName(LevelWarn) {
+		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], LevelName(LevelWarn))
 	}
 
 	expected := map[string]LogLevel{
@@ -139,8 +137,8 @@ func TestGetAllLogLevels(t *testing.T) {
 
 	all := GetAllLogLevels()
 
-	if all["*"] != zapcore.Level(LevelError).String() {
-		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], zapcore.Level(LevelError).String())
+	if all["*"] != LevelName(LevelError) {
+		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], LevelName(LevelError))
 	}
 	for name, want := range expected {
 		got, ok := all[name]
@@ -148,8 +146,8 @@ func TestGetAllLogLevels(t *testing.T) {
 			t.Errorf("missing key %q in GetAllLogLevels()", name)
 			continue
 		}
-		if got != zapcore.Level(want).String() {
-			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, zapcore.Level(want).String())
+		if got != LevelName(want) {
+			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, LevelName(want))
 		}
 	}
 
@@ -162,21 +160,33 @@ func TestGetAllLogLevels(t *testing.T) {
 	all = GetAllLogLevels()
 	if lvl, ok := all["dynamic"]; !ok {
 		t.Error(`missing "dynamic" key after creation`)
-	} else if lvl != zapcore.Level(LevelFatal).String() {
-		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, zapcore.Level(LevelFatal).String())
+	} else if lvl != LevelName(LevelFatal) {
+		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, LevelName(LevelFatal))
 	}
 
 	// ensure immutability
 	snapshot := GetAllLogLevels()
-	snapshot["*"] = zapcore.Level(LevelDebug).String()
-	snapshot["newkey"] = zapcore.Level(LevelInfo).String()
+	snapshot["*"] = LevelName(LevelDebug)
+	snapshot["newkey"] = LevelName(LevelInfo)
 
 	// ensure original state unchanged
 	fresh := GetAllLogLevels()
-	if fresh["*"] != zapcore.Level(LevelError).String() {
-		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], zapcore.Level(LevelError).String())
+	if fresh["*"] != LevelName(LevelError) {
+		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], LevelName(LevelError))
 	}
 	if _, exists := fresh["newkey"]; exists {
 		t.Error(`immutable check failed: "newkey" should not leak into real map`)
+	}
+}
+
+func TestLevelName(t *testing.T) {
+	testLevels := []LogLevel{LevelDebug, LevelInfo, LevelWarn, LevelError}
+	expectNames := []string{"debug", "info", "warn", "error"}
+
+	for i := range testLevels {
+		name := LevelName(testLevels[i])
+		if name != expectNames[i] {
+			t.Errorf("unexpected name for level: expected %s, got %s", expectNames[i], name)
+		}
 	}
 }
