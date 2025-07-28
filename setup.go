@@ -206,7 +206,6 @@ func SetLogLevel(name, level string) error {
 	// wildcard, change all
 	if name == "*" {
 		SetAllLoggers(lvl)
-		// QUESTION: Do we want to use defaultLevel and override what new loggers will be set to?
 		defaultLevel = lvl
 		return nil
 	}
