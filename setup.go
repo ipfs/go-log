@@ -262,24 +262,7 @@ func GetSubsystems() []string {
 
 // logLevelToString converts a LogLevel to its string representation
 func logLevelToString(level LogLevel) string {
-	switch level {
-	case LevelDebug:
-		return "debug"
-	case LevelInfo:
-		return "info"
-	case LevelWarn:
-		return "warn"
-	case LevelError:
-		return "error"
-	case LevelDPanic:
-		return "dpanic"
-	case LevelPanic:
-		return "panic"
-	case LevelFatal:
-		return "fatal"
-	default:
-		return fmt.Sprintf("unknown(%d)", int(level))
-	}
+	return zapcore.Level(level).String()
 }
 
 // GetLogLevel returns the current log level for a given subsystem as a string.
