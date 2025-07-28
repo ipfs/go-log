@@ -280,27 +280,24 @@ func TestGetDefaultLevel(t *testing.T) {
 		lvl, err := GetLogLevel()
 		if err != nil {
 			t.Errorf("GetLogLevel() returned error: %v", err)
-		}
-		if lvl != logLevelToString(expected) {
-			t.Errorf("GetLogLevel() = %v, want %v", lvl, logLevelToString(expected))
+		} else if lvl != zapcore.Level(expected).String() {
+			t.Errorf("GetLogLevel() = %v, want %v", lvl, zapcore.Level(expected).String())
 		}
 
 		// explicit "*"
 		lvl, err = GetLogLevel("*")
 		if err != nil {
 			t.Errorf(`GetLogLevel("*") returned error: %v`, err)
-		}
-		if lvl != logLevelToString(expected) {
-			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, logLevelToString(expected))
+		} else if lvl != zapcore.Level(expected).String() {
+			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, zapcore.Level(expected).String())
 		}
 
 		// empty string
 		lvl, err = GetLogLevel("")
 		if err != nil {
 			t.Errorf(`GetLogLevel("") returned error: %v`, err)
-		}
-		if lvl != logLevelToString(expected) {
-			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, logLevelToString(expected))
+		} else if lvl != zapcore.Level(expected).String() {
+			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, zapcore.Level(expected).String())
 		}
 
 		// multi-arg test
@@ -336,8 +333,8 @@ func TestGetAllLogLevels(t *testing.T) {
 	if len(base) != 1 {
 		t.Errorf("baseline GetAllLogLevels() length = %d; want 1", len(base))
 	}
-	if base["*"] != logLevelToString(LevelWarn) {
-		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], logLevelToString(LevelWarn))
+	if base["*"] != zapcore.Level(LevelWarn).String() {
+		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], zapcore.Level(LevelWarn).String())
 	}
 
 	expected := map[string]LogLevel{
@@ -353,8 +350,8 @@ func TestGetAllLogLevels(t *testing.T) {
 
 	all := GetAllLogLevels()
 
-	if all["*"] != logLevelToString(LevelError) {
-		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], logLevelToString(LevelError))
+	if all["*"] != zapcore.Level(LevelError).String() {
+		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], zapcore.Level(LevelError).String())
 	}
 	for name, want := range expected {
 		got, ok := all[name]
@@ -362,8 +359,8 @@ func TestGetAllLogLevels(t *testing.T) {
 			t.Errorf("missing key %q in GetAllLogLevels()", name)
 			continue
 		}
-		if got != logLevelToString(want) {
-			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, logLevelToString(want))
+		if got != zapcore.Level(want).String() {
+			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, zapcore.Level(want).String())
 		}
 	}
 
@@ -376,19 +373,19 @@ func TestGetAllLogLevels(t *testing.T) {
 	all = GetAllLogLevels()
 	if lvl, ok := all["dynamic"]; !ok {
 		t.Error(`missing "dynamic" key after creation`)
-	} else if lvl != logLevelToString(LevelFatal) {
-		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, logLevelToString(LevelFatal))
+	} else if lvl != zapcore.Level(LevelFatal).String() {
+		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, zapcore.Level(LevelFatal).String())
 	}
 
 	// ensure immutability
 	snapshot := GetAllLogLevels()
-	snapshot["*"] = logLevelToString(LevelDebug)
-	snapshot["newkey"] = logLevelToString(LevelInfo)
+	snapshot["*"] = zapcore.Level(LevelDebug).String()
+	snapshot["newkey"] = zapcore.Level(LevelInfo).String()
 
 	// ensure original state unchanged
 	fresh := GetAllLogLevels()
-	if fresh["*"] != logLevelToString(LevelError) {
-		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], logLevelToString(LevelError))
+	if fresh["*"] != zapcore.Level(LevelError).String() {
+		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], zapcore.Level(LevelError).String())
 	}
 	if _, exists := fresh["newkey"]; exists {
 		t.Error(`immutable check failed: "newkey" should not leak into real map`)

@@ -260,11 +260,6 @@ func GetSubsystems() []string {
 	return subs
 }
 
-// logLevelToString converts a LogLevel to its string representation
-func logLevelToString(level LogLevel) string {
-	return zapcore.Level(level).String()
-}
-
 // GetLogLevel returns the current log level for a given subsystem as a string.
 // If you call it with no args, it returns the defaultLevel.
 // Passing name="*" explicitly also returns the defaultLevel.
@@ -278,10 +273,10 @@ func GetLogLevel(names ...string) (string, error) {
 	}
 
 	if key == "*" {
-		return logLevelToString(defaultLevel), nil
+		return zapcore.Level(defaultLevel).String(), nil
 	}
 	if lvl, ok := levels[key]; ok {
-		return logLevelToString(LogLevel(lvl.Level())), nil
+		return zapcore.Level(LogLevel(lvl.Level())).String(), nil
 	}
 	return "", ErrNoSuchLogger
 }
@@ -295,11 +290,11 @@ func GetAllLogLevels() map[string]string {
 	result := make(map[string]string, len(levels)+1)
 
 	// Add the default level with "*" key
-	result["*"] = logLevelToString(defaultLevel)
+	result["*"] = zapcore.Level(defaultLevel).String()
 
 	// Add all subsystem levels
 	for name, level := range levels {
-		result[name] = logLevelToString(LogLevel(level.Level()))
+		result[name] = zapcore.Level(LogLevel(level.Level())).String()
 	}
 
 	return result
