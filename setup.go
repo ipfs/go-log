@@ -281,8 +281,9 @@ func GetAllLogLevels() map[string]string {
 
 	// Add the default level with "*" key
 	loggerMutex.RLock()
-	result["*"] = zapcore.Level(defaultLevel).String()
+	defLvl := defaultLevel
 	loggerMutex.RUnlock()
+	result["*"] = zapcore.Level(devLvl).String()
 
 	// Add all subsystem levels
 	for name, level := range levels {
