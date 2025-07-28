@@ -86,12 +86,8 @@ var levels = make(map[string]zap.AtomicLevel)
 var primaryFormat LogFormat = ColorizedOutput
 
 // defaultLevel is the default log level
+// New loggers will be set to `defaultLevel` when created
 var defaultLevel LogLevel = LevelError
-
-// globalLevel is the current global log level
-// New loggers will be set to `defaultLevel` by default but the current global level is currently tracked separately.
-// QUESTION: Do we want to use defaultLevel and override what new loggers will be set to?
-var globalLevel LogLevel = LevelError
 
 // primaryCore is the primary logging core
 var primaryCore zapcore.Core
@@ -117,7 +113,6 @@ func SetupLogging(cfg Config) {
 
 	primaryFormat = cfg.Format
 	defaultLevel = cfg.Level
-	globalLevel = cfg.Level
 
 	outputPaths := []string{}
 
@@ -212,7 +207,7 @@ func SetLogLevel(name, level string) error {
 	if name == "*" {
 		SetAllLoggers(lvl)
 		// QUESTION: Do we want to use defaultLevel and override what new loggers will be set to?
-		globalLevel = lvl
+		defaultLevel = lvl
 		return nil
 	}
 
@@ -288,8 +283,8 @@ func logLevelToString(level LogLevel) string {
 }
 
 // GetLogLevel returns the current log level for a given subsystem as a string.
-// If you call it with no args, it returns the global (default) level.
-// Passing name="*" explicitly also returns the global level.
+// If you call it with no args, it returns the defaultLevel.
+// Passing name="*" explicitly also returns the defaultLevel.
 func GetLogLevel(names ...string) (string, error) {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
@@ -300,7 +295,7 @@ func GetLogLevel(names ...string) (string, error) {
 	}
 
 	if key == "*" {
-		return logLevelToString(globalLevel), nil
+		return logLevelToString(defaultLevel), nil
 	}
 	if lvl, ok := levels[key]; ok {
 		return logLevelToString(LogLevel(lvl.Level())), nil
@@ -309,7 +304,7 @@ func GetLogLevel(names ...string) (string, error) {
 }
 
 // GetAllLogLevels returns a map of all current log levels for all subsystems as strings.
-// The map includes a special "*" key that represents the default (global) level.
+// The map includes a special "*" key that represents the defaultLevel.
 func GetAllLogLevels() map[string]string {
 	loggerMutex.RLock()
 	defer loggerMutex.RUnlock()
@@ -317,7 +312,7 @@ func GetAllLogLevels() map[string]string {
 	result := make(map[string]string)
 
 	// Add the default level with "*" key
-	result["*"] = logLevelToString(globalLevel)
+	result["*"] = logLevelToString(defaultLevel)
 
 	// Add all subsystem levels
 	for name, level := range levels {
@@ -334,7 +329,6 @@ func getLogger(name string) *zap.SugaredLogger {
 	if !ok {
 		level, ok := levels[name]
 		if !ok {
-			// QUESTION: Do we want to use globalLevel and override what new loggers will be set to?
 			level = zap.NewAtomicLevelAt(zapcore.Level(defaultLevel))
 			levels[name] = level
 		}
