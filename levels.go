@@ -28,3 +28,42 @@ func LevelFromString(level string) (LogLevel, error) {
 	err := lvl.Set(level)
 	return LogLevel(lvl), err
 }
+
+// LevelName returns the name of a LogLevel.
+func LevelName(level LogLevel) string {
+	return zapcore.Level(level).String()
+}
+
+// GetLogLevel returns the current log level for a given subsystem as a string.
+// Passing name="*" or name="" returns the defaultLevel.
+func GetLogLevel(name string) (string, error) {
+	if name == "*" || name == "" {
+		loggerMutex.RLock()
+		defLvl := defaultLevel
+		loggerMutex.RUnlock()
+		return LevelName(defLvl), nil
+	}
+	if lvl, ok := levels[name]; ok {
+		return lvl.Level().String(), nil
+	}
+	return "", ErrNoSuchLogger
+}
+
+// GetAllLogLevels returns a map of all current log levels for all subsystems as strings.
+// The map includes a special "*" key that represents the defaultLevel.
+func GetAllLogLevels() map[string]string {
+	result := make(map[string]string, len(levels)+1)
+
+	// Add the default level with "*" key
+	loggerMutex.RLock()
+	defLvl := defaultLevel
+	loggerMutex.RUnlock()
+	result["*"] = LevelName(defLvl)
+
+	// Add all subsystem levels
+	for name, level := range levels {
+		result[name] = level.Level().String()
+	}
+
+	return result
+}

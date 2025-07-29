@@ -86,6 +86,7 @@ var levels = make(map[string]zap.AtomicLevel)
 var primaryFormat LogFormat = ColorizedOutput
 
 // defaultLevel is the default log level
+// New loggers will be set to `defaultLevel` when created
 var defaultLevel LogLevel = LevelError
 
 // primaryCore is the primary logging core
@@ -205,6 +206,7 @@ func SetLogLevel(name, level string) error {
 	// wildcard, change all
 	if name == "*" {
 		SetAllLoggers(lvl)
+		defaultLevel = lvl
 		return nil
 	}
 
