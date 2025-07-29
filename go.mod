@@ -8,4 +8,4 @@ require (
 	go.uber.org/zap v1.27.0
 )
 
-require golang.org/x/sys v0.33.0 // indirect
+require golang.org/x/sys v0.34.0 // indirect
