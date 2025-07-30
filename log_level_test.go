@@ -69,7 +69,7 @@ func clearLoggerState() {
 	clear(levels)
 }
 
-func TestGetDefaultLevel(t *testing.T) {
+func TestDefaultLevel(t *testing.T) {
 	originalConfig := GetConfig()
 	defer SetupLogging(originalConfig)
 
@@ -81,33 +81,22 @@ func TestGetDefaultLevel(t *testing.T) {
 	for _, expected := range testCases {
 		SetupLogging(Config{Level: expected, Stderr: true})
 
-		// empty string arg
-		lvl, err := GetLogLevel("")
-		if err != nil {
-			t.Errorf("GetLogLevel() returned error: %v", err)
-		} else if lvl != LevelName(expected) {
-			t.Errorf("GetLogLevel() = %v, want %v", lvl, LevelName(expected))
+		// check default
+		if DefaultLevel() != expected {
+			t.Fatalf("wrong default level, want %v, got %v", DefaultLevel(), expected)
 		}
 
-		// explicit "*"
-		lvl, err = GetLogLevel("*")
+		// empty string subsystem
+		lvl, err := SubsystemLevelName("")
 		if err != nil {
-			t.Errorf(`GetLogLevel("*") returned error: %v`, err)
-		} else if lvl != LevelName(expected) {
-			t.Errorf(`GetLogLevel("*") = %v, want %v`, lvl, LevelName(expected))
-		}
-
-		// empty string
-		lvl, err = GetLogLevel("")
-		if err != nil {
-			t.Errorf(`GetLogLevel("") returned error: %v`, err)
-		} else if lvl != LevelName(expected) {
-			t.Errorf(`GetLogLevel("") = %v, want %v`, lvl, LevelName(expected))
+			t.Errorf("SubsystemLevelName returned error: %v", err)
+		} else if lvl != expected.String() {
+			t.Errorf("SubsystemLevelName returned %v, want %v", lvl, expected)
 		}
 	}
 }
 
-func TestGetAllLogLevels(t *testing.T) {
+func TestGetSubsystemLevelNames(t *testing.T) {
 	originalConfig := GetConfig()
 	defer SetupLogging(originalConfig)
 
@@ -115,13 +104,16 @@ func TestGetAllLogLevels(t *testing.T) {
 	clearLoggerState()
 
 	SetupLogging(Config{Level: LevelWarn, Stderr: true})
-	base := GetAllLogLevels()
+	base := SubsystemLevelNames()
 
 	if len(base) != 1 {
-		t.Errorf("baseline GetAllLogLevels() length = %d; want 1", len(base))
+		t.Errorf("baseline SubsystemLevelNames() length = %d; want 1", len(base))
 	}
-	if base["*"] != LevelName(LevelWarn) {
-		t.Errorf("baseline GetAllLogLevels()[\"*\"] = %v; want %v", base["*"], LevelName(LevelWarn))
+	if DefaultLevel() != LevelWarn {
+		t.Fatal("wrong default level")
+	}
+	if base[DefaultName] != LevelWarn.String() {
+		t.Errorf("baseline SubsystemLevelNames()[\"\"] = %v; want %v", base["*"], LevelWarn.String())
 	}
 
 	expected := map[string]LogLevel{
@@ -135,19 +127,19 @@ func TestGetAllLogLevels(t *testing.T) {
 		Stderr:          true,
 	})
 
-	all := GetAllLogLevels()
+	all := SubsystemLevelNames()
 
-	if all["*"] != LevelName(LevelError) {
-		t.Errorf(`GetAllLogLevels()["*"] = %v; want %v`, all["*"], LevelName(LevelError))
+	if all[""] != DefaultLevel().String() {
+		t.Errorf(`SubsystemLevelNames()[""] = %v; want %v`, all[""], DefaultLevel().String())
 	}
 	for name, want := range expected {
 		got, ok := all[name]
 		if !ok {
-			t.Errorf("missing key %q in GetAllLogLevels()", name)
+			t.Errorf("missing key %q in SubsystemLevelNames()", name)
 			continue
 		}
-		if got != LevelName(want) {
-			t.Errorf(`GetAllLogLevels()["%s"] = %v; want %v`, name, got, LevelName(want))
+		if got != want.String() {
+			t.Errorf(`SubsystemLevelNames()["%s"] = %v; want %v`, name, got, want.String())
 		}
 	}
 
@@ -157,36 +149,36 @@ func TestGetAllLogLevels(t *testing.T) {
 		t.Fatalf("SetLogLevel(dynamic) failed: %v", err)
 	}
 
-	all = GetAllLogLevels()
+	all = SubsystemLevelNames()
 	if lvl, ok := all["dynamic"]; !ok {
 		t.Error(`missing "dynamic" key after creation`)
-	} else if lvl != LevelName(LevelFatal) {
-		t.Errorf(`GetAllLogLevels()["dynamic"] = %v; want %v`, lvl, LevelName(LevelFatal))
+	} else if lvl != LevelFatal.String() {
+		t.Errorf(`SubsystemLevelNames()["dynamic"] = %v; want %v`, lvl, LevelFatal.String())
 	}
 
 	// ensure immutability
-	snapshot := GetAllLogLevels()
-	snapshot["*"] = LevelName(LevelDebug)
-	snapshot["newkey"] = LevelName(LevelInfo)
+	snapshot := SubsystemLevelNames()
+	snapshot[DefaultName] = DefaultLevel().String()
+	snapshot["newkey"] = LevelInfo.String()
 
 	// ensure original state unchanged
-	fresh := GetAllLogLevels()
-	if fresh["*"] != LevelName(LevelError) {
-		t.Errorf(`immutable check failed: fresh["*"] = %v; want %v`, fresh["*"], LevelName(LevelError))
+	fresh := SubsystemLevelNames()
+	if fresh[DefaultName] != LevelError.String() {
+		t.Errorf(`immutable check failed: fresh[DefaultName] = %v; want %v`, fresh[DefaultName], LevelError.String())
 	}
 	if _, exists := fresh["newkey"]; exists {
 		t.Error(`immutable check failed: "newkey" should not leak into real map`)
 	}
 }
 
-func TestLevelName(t *testing.T) {
+func TestLogLevelString(t *testing.T) {
 	testLevels := []LogLevel{LevelDebug, LevelInfo, LevelWarn, LevelError}
 	expectNames := []string{"debug", "info", "warn", "error"}
 
 	for i := range testLevels {
-		name := LevelName(testLevels[i])
-		if name != expectNames[i] {
-			t.Errorf("unexpected name for level: expected %s, got %s", expectNames[i], name)
+		if testLevels[i].String() != expectNames[i] {
+			t.Errorf("unexpected name for level: expected %s, got %s", expectNames[i], testLevels[i].String())
 		}
 	}
+
 }
