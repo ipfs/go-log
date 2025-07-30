@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -21,8 +22,8 @@ func TestNewPipeReader(t *testing.T) {
 	buf := &bytes.Buffer{}
 	go func() {
 		defer wg.Done()
-		if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-			t.Errorf("unexpected error: %v", err)
+		if _, err := io.Copy(buf, r); err != nil {
+			require.ErrorIs(t, err, io.ErrClosedPipe)
 		}
 	}()
 
@@ -30,10 +31,7 @@ func TestNewPipeReader(t *testing.T) {
 	r.Close()
 	wg.Wait()
 
-	if !strings.Contains(buf.String(), "scooby") {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
-
+	require.Contains(t, buf.String(), "scooby")
 }
 
 func TestNewPipeReaderFormat(t *testing.T) {
@@ -47,8 +45,8 @@ func TestNewPipeReaderFormat(t *testing.T) {
 	buf := &bytes.Buffer{}
 	go func() {
 		defer wg.Done()
-		if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-			t.Errorf("unexpected error: %v", err)
+		if _, err := io.Copy(buf, r); err != nil {
+			require.ErrorIs(t, err, io.ErrClosedPipe)
 		}
 	}()
 
@@ -56,10 +54,7 @@ func TestNewPipeReaderFormat(t *testing.T) {
 	r.Close()
 	wg.Wait()
 
-	if !strings.Contains(buf.String(), "scooby") {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
-
+	require.Contains(t, buf.String(), "scooby")
 }
 
 func TestNewPipeReaderLevel(t *testing.T) {
@@ -78,8 +73,8 @@ func TestNewPipeReaderLevel(t *testing.T) {
 	buf := &bytes.Buffer{}
 	go func() {
 		defer wg.Done()
-		if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-			t.Errorf("unexpected error: %v", err)
+		if _, err := io.Copy(buf, r); err != nil {
+			require.ErrorIs(t, err, io.ErrClosedPipe)
 		}
 	}()
 
@@ -92,12 +87,6 @@ func TestNewPipeReaderLevel(t *testing.T) {
 	lineEnding := zap.NewProductionEncoderConfig().LineEnding
 
 	// Should only contain one log line
-	if strings.Count(buf.String(), lineEnding) > 1 {
-		t.Errorf("got %d log lines, wanted 1", strings.Count(buf.String(), lineEnding))
-	}
-
-	if !strings.Contains(buf.String(), "shaggy") {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
-
+	require.Equal(t, 1, strings.Count(buf.String(), lineEnding), "expected 1 log line")
+	require.Contains(t, buf.String(), "shaggy")
 }

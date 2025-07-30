@@ -4,18 +4,16 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 func TestGetLoggerDefault(t *testing.T) {
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	stderr := os.Stderr
 	os.Stderr = w
@@ -31,21 +29,17 @@ func TestGetLoggerDefault(t *testing.T) {
 	w.Close()
 
 	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err = io.Copy(buf, r); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
 
-	if !strings.Contains(buf.String(), "scooby") {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
+	require.Contains(t, buf.String(), "scooby")
 }
 
 func TestLogToFileAndStderr(t *testing.T) {
 	// setup stderr
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	stderr := os.Stderr
 	os.Stderr = w
@@ -55,9 +49,7 @@ func TestLogToFileAndStderr(t *testing.T) {
 
 	// setup file
 	logfile, err := os.CreateTemp("", "go-log-test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.Remove(logfile.Name())
 
 	os.Setenv(envLoggingFile, logfile.Name())
@@ -76,31 +68,22 @@ func TestLogToFileAndStderr(t *testing.T) {
 	w.Close()
 
 	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err := io.Copy(buf, r); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
 
-	if !strings.Contains(buf.String(), want) {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
+	require.Contains(t, buf.String(), want)
 
 	content, err := os.ReadFile(logfile.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if !strings.Contains(string(content), want) {
-		t.Logf("want: '%s', got: '%s'", want, string(content))
-		t.Fail()
-	}
+	require.Contains(t, string(content), want)
 }
 
 func TestLogToFile(t *testing.T) {
 	// get tmp log file
 	logfile, err := os.CreateTemp("", "go-log-test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.Remove(logfile.Name())
 
 	// set the go-log file env var
@@ -117,21 +100,14 @@ func TestLogToFile(t *testing.T) {
 
 	// read log file and check contents
 	content, err := os.ReadFile(logfile.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if !strings.Contains(string(content), want) {
-		t.Logf("want: '%s', got: '%s'", want, string(content))
-		t.Fail()
-	}
+	require.Contains(t, string(content), want)
 }
 
 func TestLogLabels(t *testing.T) {
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	stderr := os.Stderr
 	os.Stderr = w
@@ -150,21 +126,17 @@ func TestLogLabels(t *testing.T) {
 	w.Close()
 
 	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err = io.Copy(buf, r); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
 
 	t.Log(buf.String())
-	if !strings.Contains(buf.String(), "{\"dc\": \"sjc-1\"}") {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
+	require.Contains(t, buf.String(), "{\"dc\": \"sjc-1\"}")
 }
 
 func TestSubsystemLevels(t *testing.T) {
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	stderr := os.Stderr
 	os.Stderr = w
@@ -187,33 +159,22 @@ func TestSubsystemLevels(t *testing.T) {
 	w.Close()
 
 	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err = io.Copy(buf, r); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
 
-	if !strings.Contains(buf.String(), "debug1") {
-		t.Errorf("got %q, wanted it to contain debug1", buf.String())
-	}
-	if strings.Contains(buf.String(), "debug2") {
-		t.Errorf("got %q, wanted it to not contain debug2", buf.String())
-	}
-	if !strings.Contains(buf.String(), "info1") {
-		t.Errorf("got %q, wanted it to contain info1", buf.String())
-	}
-	if !strings.Contains(buf.String(), "info2") {
-		t.Errorf("got %q, wanted it to contain info2", buf.String())
-	}
+	s := buf.String()
+	require.Contains(t, s, "debug1")
+	require.NotContains(t, s, "debug2")
+	require.Contains(t, s, "info1")
+	require.Contains(t, s, "info2")
 }
 
 func TestCustomCore(t *testing.T) {
 	r1, w1, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 	r2, w2, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	// logging should work with the custom core
 	SetPrimaryCore(newCore(PlaintextOutput, w1, LevelDebug))
@@ -229,18 +190,15 @@ func TestCustomCore(t *testing.T) {
 
 	buf1 := &bytes.Buffer{}
 	buf2 := &bytes.Buffer{}
-	if _, err := io.Copy(buf1, r1); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err = io.Copy(buf1, r1); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
-	if _, err := io.Copy(buf2, r2); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err = io.Copy(buf2, r2); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
-	if !strings.Contains(buf1.String(), "scooby") {
-		t.Errorf("got %q, wanted it to contain log output", buf1.String())
-	}
-	if !strings.Contains(buf2.String(), "doo") {
-		t.Errorf("got %q, wanted it to contain log output", buf2.String())
-	}
+
+	require.Contains(t, buf1.String(), "scooby")
+	require.Contains(t, buf2.String(), "doo")
 }
 
 func TestTeeCore(t *testing.T) {
@@ -260,14 +218,10 @@ func TestTeeCore(t *testing.T) {
 
 func TestLogToStderrAndStdout(t *testing.T) {
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	r2, w2, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	stderr := os.Stderr
 	stdout := os.Stdout
@@ -291,32 +245,24 @@ func TestLogToStderrAndStdout(t *testing.T) {
 	w2.Close()
 
 	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err = io.Copy(buf, r); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
-	if !strings.Contains(buf.String(), want) {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
+	require.Contains(t, buf.String(), want)
 
 	buf.Reset()
-	if _, err := io.Copy(buf, r2); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err = io.Copy(buf, r2); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
-	if !strings.Contains(buf.String(), want) {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
+	require.Contains(t, buf.String(), want)
 }
 
 func TestLogToStdoutOnly(t *testing.T) {
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	r2, w2, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to open pipe: %v", err)
-	}
+	require.NoError(t, err, "failed to open pipe")
 
 	stderr := os.Stderr
 	stdout := os.Stdout
@@ -340,18 +286,14 @@ func TestLogToStdoutOnly(t *testing.T) {
 	w2.Close()
 
 	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, r); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err := io.Copy(buf, r); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
-	if buf.Len() != 0 {
-		t.Errorf("Should not have read anything from stderr")
-	}
+	require.Zero(t, buf.Len())
 
 	buf.Reset()
-	if _, err := io.Copy(buf, r2); err != nil && err != io.ErrClosedPipe {
-		t.Fatalf("unexpected error: %v", err)
+	if _, err := io.Copy(buf, r2); err != nil {
+		require.ErrorIs(t, err, io.ErrClosedPipe)
 	}
-	if !strings.Contains(buf.String(), want) {
-		t.Errorf("got %q, wanted it to contain log output", buf.String())
-	}
+	require.Contains(t, buf.String(), want)
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -39,14 +40,10 @@ func TestNewCoreFormat(t *testing.T) {
 		ws := zapcore.AddSync(buf)
 
 		core := newCore(tc.format, ws, LevelDebug)
-		if err := core.Write(entry, nil); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		err := core.Write(entry, nil)
+		require.NoError(t, err)
 
-		got := buf.String()
-		if got != tc.want {
-			t.Errorf("got %q, want %q", got, tc.want)
-		}
+		require.Equal(t, tc.want, buf.String())
 	}
 
 }
@@ -68,22 +65,14 @@ func TestLockedMultiCoreAddCore(t *testing.T) {
 		Message:    "scooby",
 		Time:       time.Date(2010, 5, 23, 15, 14, 0, 0, time.UTC),
 	}
-	if err := mc.Write(entry, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err := mc.Write(entry, nil)
+	require.NoError(t, err)
 
 	want1 := "2010-05-23T15:14:00.000Z\tINFO\tmain\tscooby\n"
-	got1 := buf1.String()
-	if got1 != want1 {
-		t.Errorf("core1 got %q, want %q", got1, want1)
-	}
+	require.Equal(t, want1, buf1.String(), "core1")
 
 	want2 := "2010-05-23T15:14:00.000Z\t\x1b[34mINFO\x1b[0m\tmain\tscooby\n"
-	got2 := buf2.String()
-	if got2 != want2 {
-		t.Errorf("core2 got %q, want %q", got2, want2)
-	}
-
+	require.Equal(t, want2, buf2.String(), "core2")
 }
 
 func TestLockedMultiCoreDeleteCore(t *testing.T) {
@@ -101,9 +90,8 @@ func TestLockedMultiCoreDeleteCore(t *testing.T) {
 		Message:    "scooby",
 		Time:       time.Date(2010, 5, 23, 15, 14, 0, 0, time.UTC),
 	}
-	if err := mc.Write(entry, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err := mc.Write(entry, nil)
+	require.NoError(t, err)
 
 	buf2 := &bytes.Buffer{}
 	core2 := newCore(ColorizedOutput, zapcore.AddSync(buf2), LevelDebug)
@@ -125,17 +113,10 @@ func TestLockedMultiCoreDeleteCore(t *testing.T) {
 	}
 
 	want1 := "2010-05-23T15:14:00.000Z\tINFO\tmain\tscooby\n"
-	got1 := buf1.String()
-	if got1 != want1 {
-		t.Errorf("core1 got %q, want %q", got1, want1)
-	}
+	require.Equal(t, want1, buf1.String(), "core1")
 
 	want2 := "2010-05-23T15:15:00.000Z\t\x1b[34mINFO\x1b[0m\tmain\tvelma\n"
-	got2 := buf2.String()
-	if got2 != want2 {
-		t.Errorf("core2 got %q, want %q", got2, want2)
-	}
-
+	require.Equal(t, want2, buf2.String(), "core2")
 }
 
 func TestLockedMultiCoreReplaceCore(t *testing.T) {
@@ -152,9 +133,8 @@ func TestLockedMultiCoreReplaceCore(t *testing.T) {
 		Message:    "scooby",
 		Time:       time.Date(2010, 5, 23, 15, 14, 0, 0, time.UTC),
 	}
-	if err := mc.Write(entry, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err := mc.Write(entry, nil)
+	require.NoError(t, err)
 
 	buf2 := &bytes.Buffer{}
 	core2 := newCore(ColorizedOutput, zapcore.AddSync(buf2), LevelDebug)
@@ -170,20 +150,12 @@ func TestLockedMultiCoreReplaceCore(t *testing.T) {
 		Time:       time.Date(2010, 5, 23, 15, 15, 0, 0, time.UTC),
 	}
 
-	if err := mc.Write(entry2, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err = mc.Write(entry2, nil)
+	require.NoError(t, err)
 
 	want1 := "2010-05-23T15:14:00.000Z\tINFO\tmain\tscooby\n"
-	got1 := buf1.String()
-	if got1 != want1 {
-		t.Errorf("core1 got %q, want %q", got1, want1)
-	}
+	require.Equal(t, want1, buf1.String(), "core1")
 
 	want2 := "2010-05-23T15:15:00.000Z\t\x1b[34mINFO\x1b[0m\tmain\tvelma\n"
-	got2 := buf2.String()
-	if got2 != want2 {
-		t.Errorf("core2 got %q, want %q", got2, want2)
-	}
-
+	require.Equal(t, want2, buf2.String(), "core2")
 }

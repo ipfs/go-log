@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogLevel(t *testing.T) {
@@ -31,35 +33,27 @@ func TestLogLevel(t *testing.T) {
 				Caller  string `json:"caller"`
 			}
 			err := decoder.Decode(&entry)
-			switch err {
-			default:
-				t.Error(err)
+			if err != nil {
+				require.ErrorIs(t, err, io.EOF)
 				return
-			case io.EOF:
-				return
-			case nil:
 			}
-			if entry.Message != "bar" {
-				t.Errorf("unexpected message: %s", entry.Message)
-			}
-			if entry.Caller == "" {
-				t.Errorf("no caller in log entry")
-			}
+
+			require.Equal(t, "bar", entry.Message)
+			require.NotEmpty(t, entry.Caller, "no caller in log entry")
 		}
 	}()
 	logger.Debugw("foo")
-	if err := SetLogLevel(subsystem, "debug"); err != nil {
-		t.Error(err)
-	}
+	err := SetLogLevel(subsystem, "debug")
+	require.NoError(t, err)
+
 	logger.Debugw("bar")
 	SetAllLoggers(LevelInfo)
 	logger.Debugw("baz")
 	// ignore the error because
 	// https://github.com/uber-go/zap/issues/880
 	_ = logger.Sync()
-	if err := reader.Close(); err != nil {
-		t.Error(err)
-	}
+	err = reader.Close()
+	require.NoError(t, err)
 	<-done
 }
 
@@ -82,17 +76,12 @@ func TestDefaultLevel(t *testing.T) {
 		SetupLogging(Config{Level: expected, Stderr: true})
 
 		// check default
-		if DefaultLevel() != expected {
-			t.Fatalf("wrong default level, want %v, got %v", DefaultLevel(), expected)
-		}
+		require.Equal(t, expected, DefaultLevel(), "wrong default level")
 
 		// empty string subsystem
 		lvl, err := SubsystemLevelName("")
-		if err != nil {
-			t.Errorf("SubsystemLevelName returned error: %v", err)
-		} else if lvl != expected.String() {
-			t.Errorf("SubsystemLevelName returned %v, want %v", lvl, expected)
-		}
+		require.NoError(t, err)
+		require.Equal(t, expected.String(), lvl)
 	}
 }
 
@@ -106,15 +95,9 @@ func TestGetSubsystemLevelNames(t *testing.T) {
 	SetupLogging(Config{Level: LevelWarn, Stderr: true})
 	base := SubsystemLevelNames()
 
-	if len(base) != 1 {
-		t.Errorf("baseline SubsystemLevelNames() length = %d; want 1", len(base))
-	}
-	if DefaultLevel() != LevelWarn {
-		t.Fatal("wrong default level")
-	}
-	if base[DefaultName] != LevelWarn.String() {
-		t.Errorf("baseline SubsystemLevelNames()[\"\"] = %v; want %v", base["*"], LevelWarn.String())
-	}
+	require.Len(t, base, 1, "SubsystemLevelNames returned map with wrong size")
+	require.Equal(t, LevelWarn, DefaultLevel())
+	require.Equal(t, LevelWarn.String(), base[DefaultName], "SubsystemLevelNames has wrong default")
 
 	expected := map[string]LogLevel{
 		"test1": LevelDebug,
@@ -129,46 +112,34 @@ func TestGetSubsystemLevelNames(t *testing.T) {
 
 	all := SubsystemLevelNames()
 
-	if all[""] != DefaultLevel().String() {
-		t.Errorf(`SubsystemLevelNames()[""] = %v; want %v`, all[""], DefaultLevel().String())
-	}
+	require.Equal(t, DefaultLevel().String(), all[DefaultName], "SubsystemLevelNames has wrong default")
 	for name, want := range expected {
 		got, ok := all[name]
-		if !ok {
-			t.Errorf("missing key %q in SubsystemLevelNames()", name)
-			continue
-		}
-		if got != want.String() {
-			t.Errorf(`SubsystemLevelNames()["%s"] = %v; want %v`, name, got, want.String())
-		}
+		require.True(t, ok, "missing key %q in SubsystemLevelNames", name)
+		require.Equal(t, want.String(), got)
 	}
 
 	// dynamic logger test
-	_ = Logger("dynamic")
-	if err := SetLogLevel("dynamic", "fatal"); err != nil {
-		t.Fatalf("SetLogLevel(dynamic) failed: %v", err)
-	}
+	const dynKey = "dynamic"
+	_ = Logger(dynKey)
+	err := SetLogLevel(dynKey, "fatal")
+	require.NoError(t, err)
 
 	all = SubsystemLevelNames()
-	if lvl, ok := all["dynamic"]; !ok {
-		t.Error(`missing "dynamic" key after creation`)
-	} else if lvl != LevelFatal.String() {
-		t.Errorf(`SubsystemLevelNames()["dynamic"] = %v; want %v`, lvl, LevelFatal.String())
-	}
+	lvl, ok := all[dynKey]
+	require.True(t, ok, "missing %q key after creation", dynKey)
+	require.Equalf(t, LevelFatal.String(), lvl, "wrong value for key %q", dynKey)
 
 	// ensure immutability
+	const newKey = "newkey"
 	snapshot := SubsystemLevelNames()
 	snapshot[DefaultName] = DefaultLevel().String()
-	snapshot["newkey"] = LevelInfo.String()
+	snapshot[newKey] = LevelInfo.String()
 
 	// ensure original state unchanged
 	fresh := SubsystemLevelNames()
-	if fresh[DefaultName] != LevelError.String() {
-		t.Errorf(`immutable check failed: fresh[DefaultName] = %v; want %v`, fresh[DefaultName], LevelError.String())
-	}
-	if _, exists := fresh["newkey"]; exists {
-		t.Error(`immutable check failed: "newkey" should not leak into real map`)
-	}
+	require.Equal(t, LevelError.String(), fresh[DefaultName], "immutable check failed, wrong default level")
+	require.NotContains(t, fresh, newKey, "new key should not leak into internal map")
 }
 
 func TestLogLevelString(t *testing.T) {
@@ -176,9 +147,6 @@ func TestLogLevelString(t *testing.T) {
 	expectNames := []string{"debug", "info", "warn", "error"}
 
 	for i := range testLevels {
-		if testLevels[i].String() != expectNames[i] {
-			t.Errorf("unexpected name for level: expected %s, got %s", expectNames[i], testLevels[i].String())
-		}
+		require.Equal(t, expectNames[i], testLevels[i].String(), "unexpected name for level")
 	}
-
 }
