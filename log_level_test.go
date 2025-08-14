@@ -43,8 +43,12 @@ func TestLogLevel(t *testing.T) {
 		}
 	}()
 	logger.Debugw("foo")
+	require.True(t, logger.LevelEnabled(LevelError))
+	require.False(t, logger.LevelEnabled(LevelDebug))
 	err := SetLogLevel(subsystem, "debug")
 	require.NoError(t, err)
+	require.True(t, logger.LevelEnabled(LevelError))
+	require.True(t, logger.LevelEnabled(LevelDebug))
 
 	logger.Debugw("bar")
 	SetAllLoggers(LevelInfo)
