@@ -3,6 +3,7 @@
 package log
 
 import (
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -56,6 +57,24 @@ type ZapEventLogger struct {
 	// used to fix the caller location when calling Warning and Warningf.
 	skipLogger zap.SugaredLogger
 	system     string
+}
+
+// AnnotateName annotates the logger's system name with the given annotation, prepending
+// it if specified.
+func (logger *ZapEventLogger) AnnotateName(annotation string, prepend bool) {
+	newName := logger.system
+	if prepend {
+		newName = fmt.Sprintf("%s:%s", annotation, newName)
+	} else {
+		newName = fmt.Sprintf("%s:%s", newName, annotation)
+	}
+	// register new logger system name
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+	delete(loggers, logger.system)
+	loggers[newName] = &logger.SugaredLogger
+
+	logger.system = newName
 }
 
 // Warning is for compatibility
