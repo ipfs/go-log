@@ -111,7 +111,25 @@ func (l *lockedMultiCore) ReplaceCore(original, replacement zapcore.Core) {
 func newCore(format LogFormat, ws zapcore.WriteSyncer, level LogLevel) zapcore.Core {
 	encCfg := zap.NewProductionEncoderConfig()
 	encCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	var encoder zapcore.Encoder
+	switch format {
+	case PlaintextOutput:
+		encCfg.EncodeLevel = zapcore.CapitalLevelEncoder
+		encoder = zapcore.NewConsoleEncoder(encCfg)
+	case JSONOutput:
+		encoder = zapcore.NewJSONEncoder(encCfg)
+	default:
+		encCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		encoder = zapcore.NewConsoleEncoder(encCfg)
+	}
 
+	return zapcore.NewCore(encoder, ws, zap.NewAtomicLevelAt(zapcore.Level(level)))
+}
+
+func newCoreWithFullCallerEncCfg(format LogFormat, ws zapcore.WriteSyncer, level LogLevel) zapcore.Core {
+	encCfg := zap.NewProductionEncoderConfig()
+	encCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encCfg.EncodeCaller = zapcore.FullCallerEncoder
 	var encoder zapcore.Encoder
 	switch format {
 	case PlaintextOutput:

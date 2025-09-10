@@ -37,6 +37,9 @@ const (
 
 	envLoggingOutput = "GOLOG_OUTPUT"     // possible values: stdout|stderr|file combine multiple values with '+'
 	envLoggingLabels = "GOLOG_LOG_LABELS" // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
+	// full: /full/path/to/package/file:line format.
+	// short: package/file:line format, trimming all but the final directory from the full path.
+	envLoggingCallerFormat = "GOLOG_LOG_CALLER_FORMAT" // possible values: full|short
 )
 
 type LogFormat int
@@ -71,6 +74,9 @@ type Config struct {
 
 	// Labels is a set of key-values to apply to all loggers
 	Labels map[string]string
+
+	// Format for Caller line. possible values: full|short. default short.
+	CallerFormat string
 }
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
@@ -139,8 +145,12 @@ func SetupLogging(cfg Config) {
 	if err != nil {
 		panic(fmt.Sprintf("unable to open logging output: %v", err))
 	}
-
-	newPrimaryCore := newCore(primaryFormat, ws, LevelDebug) // the main core needs to log everything.
+	var newPrimaryCore zapcore.Core
+	if cfg.CallerFormat == "short" {
+		newPrimaryCore = newCore(primaryFormat, ws, LevelDebug) // the main core needs to log everything.
+	} else {
+		newPrimaryCore = newCoreWithFullCallerEncCfg(primaryFormat, ws, LevelDebug) // the main core needs to log everything.
+	}
 
 	for k, v := range cfg.Labels {
 		newPrimaryCore = newPrimaryCore.With([]zap.Field{zap.String(k, v)})
@@ -389,6 +399,13 @@ func configFromEnv() Config {
 			}
 			cfg.Labels[kv[0]] = kv[1]
 		}
+	}
+
+	CallerFormat := os.Getenv(envLoggingCallerFormat)
+	if CallerFormat == "full" {
+		cfg.CallerFormat = "full"
+	} else {
+		cfg.CallerFormat = "short"
 	}
 
 	return cfg
