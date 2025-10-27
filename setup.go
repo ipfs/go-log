@@ -36,9 +36,9 @@ const (
 	envLoggingFile = "GOLOG_FILE" // /path/to/file
 	envLoggingURL  = "GOLOG_URL"  // url that will be processed by sink in the zap
 
-	envLoggingOutput  = "GOLOG_OUTPUT"             // possible values: stdout|stderr|file combine multiple values with '+'
-	envLoggingLabels  = "GOLOG_LOG_LABELS"         // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
-	envCaptureSlog    = "GOLOG_CAPTURE_DEFAULT_SLOG" // set to "false" to disable routing slog logs through go-log's zap core
+	envLoggingOutput = "GOLOG_OUTPUT"               // possible values: stdout|stderr|file combine multiple values with '+'
+	envLoggingLabels = "GOLOG_LOG_LABELS"           // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
+	envCaptureSlog   = "GOLOG_CAPTURE_DEFAULT_SLOG" // set to "false" to disable routing slog logs through go-log's zap core
 )
 
 type LogFormat int

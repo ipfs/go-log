@@ -199,7 +199,7 @@ func (h *zapToSlogBridge) WithGroup(name string) slog.Handler {
 	return &zapToSlogBridge{
 		core:          h.core,
 		subsystemName: h.subsystemName, // Preserve subsystem
-		fields:        h.fields,         // Preserve fields
+		fields:        h.fields,        // Preserve fields
 	}
 }
 
