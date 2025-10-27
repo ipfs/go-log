@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -86,6 +87,10 @@ func TestSlogBridgeLevels(t *testing.T) {
 }
 
 func TestSlogAttrFieldConversions(t *testing.T) {
+	// Save and restore global state
+	originalDefault := slog.Default()
+	defer slog.SetDefault(originalDefault)
+
 	// Test that slog.Attr types are correctly converted to zap fields
 	var buf bytes.Buffer
 	ws := zapcore.AddSync(&buf)
@@ -164,6 +169,20 @@ func TestSlogAttrFieldConversions(t *testing.T) {
 }
 
 func TestSubsystemAwareLevelControl(t *testing.T) {
+	// Save and restore global state
+	originalDefault := slog.Default()
+	defer slog.SetDefault(originalDefault)
+
+	loggerMutex.Lock()
+	originalLevels := levels
+	levels = make(map[string]zap.AtomicLevel)
+	loggerMutex.Unlock()
+	defer func() {
+		loggerMutex.Lock()
+		levels = originalLevels
+		loggerMutex.Unlock()
+	}()
+
 	// Capture log output
 	var buf bytes.Buffer
 
@@ -230,6 +249,20 @@ func TestSubsystemAwareLevelControl(t *testing.T) {
 }
 
 func TestSetLogLevelWithSlog(t *testing.T) {
+	// Save and restore global state
+	originalDefault := slog.Default()
+	defer slog.SetDefault(originalDefault)
+
+	loggerMutex.Lock()
+	originalLevels := levels
+	levels = make(map[string]zap.AtomicLevel)
+	loggerMutex.Unlock()
+	defer func() {
+		loggerMutex.Lock()
+		levels = originalLevels
+		loggerMutex.Unlock()
+	}()
+
 	// Setup go-log
 	var buf bytes.Buffer
 	ws := zapcore.AddSync(&buf)
