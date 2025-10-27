@@ -122,6 +122,102 @@ pairs. For example, the following add `{"app": "example_app", "dc": "sjc-1"}` to
 export GOLOG_LOG_LABELS="app=example_app,dc=sjc-1"
 ```
 
+#### `GOLOG_CAPTURE_DEFAULT_SLOG`
+
+When `SetupLogging()` is called, go-log automatically routes slog logs through its zap core for consistent formatting and dynamic level control (unless explicitly disabled). This means libraries using `slog` (like go-libp2p) will automatically use go-log's formatting and respect dynamic level changes (e.g., via `ipfs log level` commands).
+
+To disable this behavior and keep `slog.Default()` unchanged, set:
+
+```bash
+export GOLOG_CAPTURE_DEFAULT_SLOG="false"
+```
+
+### Slog Integration
+
+go-log automatically integrates with Go's `log/slog` package when `SetupLogging()` is called. This provides:
+
+1. **Unified formatting**: slog logs use the same format as go-log (color/nocolor/json)
+2. **Dynamic level control**: slog loggers respect `SetLogLevel()` and environment variables
+3. **Subsystem-aware filtering**: slog loggers with subsystem attributes get per-subsystem level control
+
+**Note**: This slog bridge exists as an intermediate solution while go-log uses zap internally. In the future, go-log may migrate from zap to native slog, which would simplify this integration.
+
+#### How it works
+
+Libraries like go-libp2p use gologshim to create slog loggers. When these loggers detect go-log's slog bridge, they automatically integrate with go-log's level control.
+
+**Attributes added by gologshim:**
+- `logger`: Subsystem name (e.g., "ping", "swarm2", "basichost")
+- Any additional labels from `GOLOG_LOG_LABELS`
+
+Example from go-libp2p's ping protocol:
+```go
+var log = logging.Logger("ping")  // gologshim
+log.Debug("ping error", "err", err)
+```
+
+Output when formatted by go-log (JSON format shown here, also supports color/nocolor):
+```json
+{
+  "level": "debug",
+  "ts": "2025-10-27T12:34:56.789+0100",
+  "logger": "ping",
+  "caller": "ping/ping.go:72",
+  "msg": "ping error",
+  "err": "connection refused"
+}
+```
+
+#### Controlling slog logger levels
+
+These loggers respect go-log's level configuration:
+
+```bash
+# Via environment variable (before daemon starts)
+export GOLOG_LOG_LEVEL="error,ping=debug"
+
+# Via API (while daemon is running)
+logging.SetLogLevel("ping", "debug")
+```
+
+This works even if the logger is created lazily or hasn't been created yet. Level settings are preserved and applied when the logger is first used.
+
+#### For library authors
+
+If you're writing a library that uses `log/slog` and want to integrate with go-log's level control system, you can detect go-log's slog bridge using duck typing to avoid including go-log in your library's go.mod:
+
+```go
+// Check if slog.Default() is go-log's bridge
+type goLogBridge interface {
+    GoLogBridge()
+}
+
+if _, ok := slog.Default().Handler().(goLogBridge); ok {
+    // go-log's bridge is active - use it for consistent formatting
+    // and dynamic level control via WithAttrs to add subsystem name
+    h := slog.Default().Handler().WithAttrs([]slog.Attr{
+        slog.String("logger", "mysubsystem"),
+    })
+    return slog.New(h)
+}
+
+// Fallback: create your own slog handler
+```
+
+This pattern allows libraries to integrate without adding go-log as a dependency. The `GoLogBridge()` marker method is implemented by both `zapToSlogBridge` and `subsystemAwareHandler` types in go-log's slog bridge.
+
+For a complete example, see [go-libp2p's gologshim](https://github.com/libp2p/go-libp2p/blob/master/gologshim/gologshim.go).
+
+#### Disabling slog integration
+
+To disable automatic slog integration and keep `slog.Default()` unchanged:
+
+```bash
+export GOLOG_CAPTURE_DEFAULT_SLOG="false"
+```
+
+When disabled, go-libp2p's gologshim will create its own slog handlers that write to stderr.
+
 ## Contribute
 
 Feel free to join in. All welcome. Open an [issue](https://github.com/ipfs/go-log/issues)!
