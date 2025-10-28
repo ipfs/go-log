@@ -175,11 +175,14 @@ func TestSubsystemAwareLevelControl(t *testing.T) {
 
 	loggerMutex.Lock()
 	originalLevels := levels
+	originalDefaultLevel := defaultLevel
 	levels = make(map[string]zap.AtomicLevel)
+	defaultLevel = LevelError
 	loggerMutex.Unlock()
 	defer func() {
 		loggerMutex.Lock()
 		levels = originalLevels
+		defaultLevel = originalDefaultLevel
 		loggerMutex.Unlock()
 	}()
 
@@ -255,11 +258,14 @@ func TestSetLogLevelWithSlog(t *testing.T) {
 
 	loggerMutex.Lock()
 	originalLevels := levels
+	originalDefaultLevel := defaultLevel
 	levels = make(map[string]zap.AtomicLevel)
+	defaultLevel = LevelError
 	loggerMutex.Unlock()
 	defer func() {
 		loggerMutex.Lock()
 		levels = originalLevels
+		defaultLevel = originalDefaultLevel
 		loggerMutex.Unlock()
 	}()
 
