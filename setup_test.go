@@ -297,3 +297,37 @@ func TestLogToStdoutOnly(t *testing.T) {
 	}
 	require.Contains(t, buf.String(), want)
 }
+
+func TestSetLogLevelAutoCreate(t *testing.T) {
+	// Save and restore original state to avoid test pollution
+	loggerMutex.Lock()
+	originalLevels := levels
+	levels = make(map[string]zap.AtomicLevel)
+	loggerMutex.Unlock()
+	defer func() {
+		loggerMutex.Lock()
+		levels = originalLevels
+		loggerMutex.Unlock()
+	}()
+
+	// Set level for non-existent subsystem (should succeed)
+	err := SetLogLevel("nonexistent", "debug")
+	require.NoError(t, err)
+
+	// Verify level entry was created
+	loggerMutex.RLock()
+	atomicLevel, exists := levels["nonexistent"]
+	loggerMutex.RUnlock()
+
+	require.True(t, exists, "level entry should be auto-created")
+	require.Equal(t, zapcore.DebugLevel, atomicLevel.Level())
+
+	// Change level (should update existing entry)
+	err = SetLogLevel("nonexistent", "error")
+	require.NoError(t, err)
+	require.Equal(t, zapcore.ErrorLevel, atomicLevel.Level())
+
+	// Invalid level should still fail
+	err = SetLogLevel("nonexistent", "invalid")
+	require.Error(t, err)
+}
