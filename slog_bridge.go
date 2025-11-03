@@ -37,10 +37,9 @@ type subsystemAwareHandler struct {
 	atomicLevel zap.AtomicLevel
 }
 
-// GoLogBridge is a marker method that identifies this handler as belonging to go-log,
-// allowing libraries like go-libp2p's gologshim to detect and use it instead of
-// creating their own handlers. This method is intentionally empty and exists only for
-// type detection via duck typing to avoid including go-log in the library's go.mod.
+// GoLogBridge is a marker method that allows libraries to detect go-log's slog bridge
+// at runtime via duck typing, without adding go-log to their dependency tree.
+// This enables automatic integration when go-log is present in the application.
 func (h *subsystemAwareHandler) GoLogBridge() {}
 
 func (h *subsystemAwareHandler) Enabled(_ context.Context, level slog.Level) bool {
@@ -109,10 +108,9 @@ func getOrCreateAtomicLevel(subsystem string) zap.AtomicLevel {
 	return atomicLevel
 }
 
-// GoLogBridge is a marker method that identifies this handler as belonging to go-log,
-// allowing libraries like go-libp2p's gologshim to detect and use it instead of
-// creating their own handlers. This method is intentionally empty and exists only for
-// type detection via duck typing to avoid including go-log in the library's go.mod.
+// GoLogBridge is a marker method that allows libraries to detect go-log's slog bridge
+// at runtime via duck typing, without adding go-log to their dependency tree.
+// This enables automatic integration when go-log is present in the application.
 func (h *zapToSlogBridge) GoLogBridge() {}
 
 // Enabled implements slog.Handler.

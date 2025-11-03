@@ -144,9 +144,9 @@ go-log automatically integrates with Go's `log/slog` package when `SetupLogging(
 
 #### How it works
 
-Libraries like go-libp2p use gologshim to create slog loggers. When these loggers detect go-log's slog bridge, they automatically integrate with go-log's level control.
+When go-log is present in an application, slog-based libraries (like go-libp2p) can integrate with it to gain unified formatting and dynamic level control.
 
-**Attributes added by gologshim:**
+**Attributes added by libraries:**
 - `logger`: Subsystem name (e.g., "ping", "swarm2", "basichost")
 - Any additional labels from `GOLOG_LOG_LABELS`
 
@@ -156,7 +156,7 @@ var log = logging.Logger("ping")  // gologshim
 log.Debug("ping error", "err", err)
 ```
 
-Output when formatted by go-log (JSON format shown here, also supports color/nocolor):
+When integrated with go-log, output is formatted by go-log (JSON format shown here, also supports color/nocolor):
 ```json
 {
   "level": "debug",
@@ -182,9 +182,48 @@ logging.SetLogLevel("ping", "debug")
 
 This works even if the logger is created lazily or hasn't been created yet. Level settings are preserved and applied when the logger is first used.
 
+#### Direct slog usage without subsystem
+
+When using slog.Default() directly without adding a "logger" attribute, logs still work but have limitations:
+
+**What works:**
+- Logs appear in output with go-log's formatting (JSON/color/nocolor)
+- Uses global log level from `GOLOG_LOG_LEVEL` fallback or `SetAllLoggers()`
+
+**Limitations:**
+- No subsystem-specific level control via `SetLogLevel("subsystem", "level")`
+- Empty logger name in output
+- Less efficient (no early atomic level filtering)
+
+**Example:**
+```go
+// Direct slog usage - uses global level only
+slog.Info("message")  // LoggerName = "", uses global level
+
+// Library with subsystem (like gologshim) - subsystem-aware
+log := gologshim.Logger("mysubsystem")
+log.Info("message")  // LoggerName = "mysubsystem", uses subsystem level
+```
+
+For libraries, use the "logger" attribute pattern to enable per-subsystem control.
+
+#### Why "logger" attribute?
+
+go-log uses `"logger"` as the attribute key for subsystem names to maintain backward compatibility with its existing Zap-based output format:
+
+- Maintains compatibility with existing go-log output format
+- Existing tooling, dashboards, and log processors already parse the "logger" field
+- Simplifies migration path from Zap to slog bridge
+
+Libraries integrating with go-log should use this same attribute key to ensure proper subsystem-aware level control.
+
 #### For library authors
 
-If you're writing a library that uses `log/slog` and want to integrate with go-log's level control system, you can detect go-log's slog bridge using duck typing to avoid including go-log in your library's go.mod:
+Libraries using slog can integrate with go-log without adding go-log as a dependency. There are two approaches:
+
+**Approach 1: Duck-typing detection (automatic)**
+
+Detect go-log's slog bridge via an interface marker to avoid requiring go-log in library's go.mod:
 
 ```go
 // Check if slog.Default() is go-log's bridge
@@ -193,8 +232,7 @@ type goLogBridge interface {
 }
 
 if _, ok := slog.Default().Handler().(goLogBridge); ok {
-    // go-log's bridge is active - use it for consistent formatting
-    // and dynamic level control via WithAttrs to add subsystem name
+    // go-log's bridge is active - use it with subsystem attribute
     h := slog.Default().Handler().WithAttrs([]slog.Attr{
         slog.String("logger", "mysubsystem"),
     })
@@ -204,7 +242,54 @@ if _, ok := slog.Default().Handler().(goLogBridge); ok {
 // Fallback: create your own slog handler
 ```
 
-This pattern allows libraries to integrate without adding go-log as a dependency. The `GoLogBridge()` marker method is implemented by both `zapToSlogBridge` and `subsystemAwareHandler` types in go-log's slog bridge.
+This pattern allows libraries to automatically integrate when go-log is present, without requiring coordination from the application.
+
+**Approach 2: Explicit handler passing (manual)**
+
+Alternatively, expose a way for applications to provide a handler explicitly:
+
+```go
+// In your library's logging package
+var defaultHandler atomic.Pointer[slog.Handler]
+
+func SetDefaultHandler(handler slog.Handler) {
+    defaultHandler.Store(&handler)
+}
+
+func Logger(subsystem string) *slog.Logger {
+    if h := defaultHandler.Load(); h != nil {
+        return slog.New((*h).WithAttrs([]slog.Attr{
+            slog.String("logger", subsystem),
+        }))
+    }
+    return slog.New(createFallbackHandler(subsystem))
+}
+```
+
+**Application side** must explicitly wire it, for example, go-libp2p requires:
+
+```go
+import (
+    "log/slog"
+    "github.com/libp2p/go-libp2p/gologshim"
+)
+
+func init() {
+    handler := slog.Default().Handler()
+
+    // Optional: verify it's go-log's bridge via duck typing
+    type goLogBridge interface {
+        GoLogBridge()
+    }
+    if _, ok := handler.(goLogBridge); !ok {
+        panic("aborting startup: slog.Default() is not go-log's bridge, logs would be missing due to incorrect wiring")
+    }
+
+    gologshim.SetDefaultHandler(handler)
+}
+```
+
+**Tradeoff**: Approach 2 requires manual coordination in every application, while Approach 1 works automatically. However, Approach 2 is more explicit about dependencies.
 
 For a complete example, see [go-libp2p's gologshim](https://github.com/libp2p/go-libp2p/blob/master/gologshim/gologshim.go).
 

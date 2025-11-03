@@ -362,7 +362,9 @@ func TestPipeReaderCapturesSlogLogs(t *testing.T) {
 	}
 }
 
-// createGologshimStyleLogger simulates gologshim.Logger() behavior
+// createGologshimStyleLogger simulates gologshim.Logger() behavior.
+// After SetupLogging is called, slog.Default() contains go-log's bridge.
+// This function checks for the bridge and uses it with WithAttrs to add the subsystem.
 func createGologshimStyleLogger(system string) *slog.Logger {
 	if _, ok := slog.Default().Handler().(goLogBridge); ok {
 		attrs := []slog.Attr{slog.String("logger", system)}
@@ -373,7 +375,7 @@ func createGologshimStyleLogger(system string) *slog.Logger {
 }
 
 func TestPipeReaderCapturesGologshimStyleLogs(t *testing.T) {
-	// Setup go-log
+	// Setup go-log (this installs the slog bridge to slog.Default())
 	SetupLogging(Config{
 		Format: JSONOutput,
 		Level:  LevelError,
