@@ -1,13 +1,24 @@
 # go-log
 
-[![](https://img.shields.io/badge/made%20by-Protocol%20Labs-blue.svg?style=flat-square)](https://protocol.ai)
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](https://ipfs.io/)
 [![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-log/v2.svg)](https://pkg.go.dev/github.com/ipfs/go-log/v2)
 
-> The logging library used by go-ipfs
+> The logging library used by go-ipfs with Go's log/slog support
 
 go-log wraps [zap](https://github.com/uber-go/zap) to provide a logging facade. go-log manages logging
-instances and allows for their levels to be controlled individually.
+instances and allows for their levels to be controlled individually. It includes a bridge to Go's native log/slog package for unified logging across IPFS/libp2p components.
+
+## Table of Contents
+
+- [Install](#install)
+- [Usage](#usage)
+  - [Environment Variables](#environment-variables)
+  - [Slog Integration](#slog-integration)
+    - [For library authors](#for-library-authors)
+      - [Approach 1: Duck-typing detection (automatic)](#approach-1-duck-typing-detection-automatic)
+      - [Approach 2: Explicit handler passing (manual)](#approach-2-explicit-handler-passing-manual)
+- [Contribute](#contribute)
+- [License](#license)
 
 ## Install
 
@@ -147,13 +158,13 @@ go-log automatically integrates with Go's `log/slog` package when `SetupLogging(
 When go-log is present in an application, slog-based libraries (like go-libp2p) can integrate with it to gain unified formatting and dynamic level control.
 
 **Attributes added by libraries:**
-- `logger`: Subsystem name (e.g., "ping", "swarm2", "basichost")
+- `logger`: Subsystem name (e.g., "foo", "bar", "baz")
 - Any additional labels from `GOLOG_LOG_LABELS`
 
-Example from go-libp2p's ping protocol:
+Example:
 ```go
-var log = logging.Logger("ping")  // gologshim
-log.Debug("ping error", "err", err)
+var log = logging.Logger("foo")  // gologshim
+log.Debug("operation failed", "err", err)
 ```
 
 When integrated with go-log, output is formatted by go-log (JSON format shown here, also supports color/nocolor):
@@ -161,9 +172,9 @@ When integrated with go-log, output is formatted by go-log (JSON format shown he
 {
   "level": "debug",
   "ts": "2025-10-27T12:34:56.789+0100",
-  "logger": "ping",
-  "caller": "ping/ping.go:72",
-  "msg": "ping error",
+  "logger": "foo",
+  "caller": "foo/foo.go:72",
+  "msg": "operation failed",
   "err": "connection refused"
 }
 ```
@@ -174,10 +185,10 @@ These loggers respect go-log's level configuration:
 
 ```bash
 # Via environment variable (before daemon starts)
-export GOLOG_LOG_LEVEL="error,ping=debug"
+export GOLOG_LOG_LEVEL="error,foo=debug"
 
 # Via API (while daemon is running)
-logging.SetLogLevel("ping", "debug")
+logging.SetLogLevel("foo", "debug")
 ```
 
 This works even if the logger is created lazily or hasn't been created yet. Level settings are preserved and applied when the logger is first used.
@@ -200,9 +211,9 @@ When using slog.Default() directly without adding a "logger" attribute, logs sti
 // Direct slog usage - uses global level only
 slog.Info("message")  // LoggerName = "", uses global level
 
-// Library with subsystem (like gologshim) - subsystem-aware
-log := gologshim.Logger("mysubsystem")
-log.Info("message")  // LoggerName = "mysubsystem", uses subsystem level
+// Library with subsystem - subsystem-aware
+log := mylib.Logger("foo")
+log.Info("message")  // LoggerName = "foo", uses subsystem level
 ```
 
 For libraries, use the "logger" attribute pattern to enable per-subsystem control.
@@ -221,30 +232,43 @@ Libraries integrating with go-log should use this same attribute key to ensure p
 
 Libraries using slog can integrate with go-log without adding go-log as a dependency. There are two approaches:
 
-**Approach 1: Duck-typing detection (automatic)**
+##### Approach 1: Duck-typing detection (automatic)
 
 Detect go-log's slog bridge via an interface marker to avoid requiring go-log in library's go.mod:
 
 ```go
-// Check if slog.Default() is go-log's bridge
-type goLogBridge interface {
-    GoLogBridge()
-}
+// In your library's logging package
+func Logger(subsystem string) *slog.Logger {
+    // Check if slog.Default() is go-log's bridge.
+    // go-log automatically installs its bridge via slog.SetDefault() when
+    // SetupLogging() is called (unless disabled via GOLOG_CAPTURE_DEFAULT_SLOG=false).
+    handler := slog.Default().Handler()
 
-if _, ok := slog.Default().Handler().(goLogBridge); ok {
-    // go-log's bridge is active - use it with subsystem attribute
-    h := slog.Default().Handler().WithAttrs([]slog.Attr{
-        slog.String("logger", "mysubsystem"),
-    })
-    return slog.New(h)
-}
+    type goLogBridge interface {
+        GoLogBridge()
+    }
+    if _, ok := handler.(goLogBridge); ok {
+        // go-log's bridge is active - use it with subsystem attribute
+        h := handler.WithAttrs([]slog.Attr{
+            slog.String("logger", subsystem),
+        })
+        return slog.New(h)
+    }
 
-// Fallback: create your own slog handler
+    // Standalone handler when go-log is not present
+    return slog.New(createStandaloneHandler(subsystem))
+}
+```
+
+Usage in your library:
+```go
+var log = mylib.Logger("foo")
+log.Debug("operation completed", "key", value)
 ```
 
 This pattern allows libraries to automatically integrate when go-log is present, without requiring coordination from the application.
 
-**Approach 2: Explicit handler passing (manual)**
+##### Approach 2: Explicit handler passing (manual)
 
 Alternatively, expose a way for applications to provide a handler explicitly:
 
@@ -258,12 +282,20 @@ func SetDefaultHandler(handler slog.Handler) {
 
 func Logger(subsystem string) *slog.Logger {
     if h := defaultHandler.Load(); h != nil {
+        // Use provided handler with subsystem attribute
         return slog.New((*h).WithAttrs([]slog.Attr{
             slog.String("logger", subsystem),
         }))
     }
-    return slog.New(createFallbackHandler(subsystem))
+    // Standalone handler when go-log is not present
+    return slog.New(createStandaloneHandler(subsystem))
 }
+```
+
+Usage in your library:
+```go
+var log = mylib.Logger("bar")
+log.Info("started service", "addr", addr)
 ```
 
 **Application side** must explicitly wire it, for example, go-libp2p requires:
@@ -275,6 +307,8 @@ import (
 )
 
 func init() {
+    // go-log installs its bridge via slog.SetDefault() when SetupLogging() is called
+    // (unless disabled via GOLOG_CAPTURE_DEFAULT_SLOG=false)
     handler := slog.Default().Handler()
 
     // Optional: verify it's go-log's bridge via duck typing
