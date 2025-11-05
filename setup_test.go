@@ -3,7 +3,9 @@ package log
 import (
 	"bytes"
 	"io"
+	"log/slog"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -330,4 +332,135 @@ func TestSetLogLevelAutoCreate(t *testing.T) {
 	// Invalid level should still fail
 	err = SetLogLevel("nonexistent", "invalid")
 	require.Error(t, err)
+}
+
+func TestSlogHandler_ReturnsNonNil(t *testing.T) {
+	// SetupLogging is called in init(), so SlogHandler should return non-nil
+	handler := SlogHandler()
+	require.NotNil(t, handler, "SlogHandler should return non-nil handler")
+}
+
+func TestSlogHandler_MatchesSlogDefault(t *testing.T) {
+	// Save original slog.Default for cleanup
+	originalDefault := slog.Default()
+	defer slog.SetDefault(originalDefault)
+
+	// Reset environment
+	os.Unsetenv(envCaptureSlog)
+
+	// Setup with capture enabled (default)
+	SetupLogging(Config{
+		Format: PlaintextOutput,
+		Stderr: true,
+		Level:  LevelError,
+	})
+
+	// SlogHandler and slog.Default().Handler() should be the same
+	handler := SlogHandler()
+	defaultHandler := slog.Default().Handler()
+
+	require.NotNil(t, handler)
+	require.NotNil(t, defaultHandler)
+
+	// Verify duck-typing marker works
+	type goLogBridge interface {
+		GoLogBridge()
+	}
+	_, ok := handler.(goLogBridge)
+	require.True(t, ok, "SlogHandler should implement GoLogBridge marker")
+
+	_, ok = defaultHandler.(goLogBridge)
+	require.True(t, ok, "slog.Default().Handler() should implement GoLogBridge marker when capture is enabled")
+}
+
+func TestSlogHandler_WorksWhenCaptureDisabled(t *testing.T) {
+	// Save original slog.Default for cleanup
+	originalDefault := slog.Default()
+	defer slog.SetDefault(originalDefault)
+
+	// Reset slog.Default() to stdlib default before testing
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	// Disable automatic capture
+	os.Setenv(envCaptureSlog, "false")
+	defer os.Unsetenv(envCaptureSlog)
+
+	// Setup with capture disabled
+	SetupLogging(Config{
+		Format: PlaintextOutput,
+		Stderr: true,
+		Level:  LevelError,
+	})
+
+	// SlogHandler should still return a valid handler
+	handler := SlogHandler()
+	require.NotNil(t, handler, "SlogHandler should work even when GOLOG_CAPTURE_DEFAULT_SLOG=false")
+
+	// Verify it's go-log's bridge
+	type goLogBridge interface {
+		GoLogBridge()
+	}
+	_, ok := handler.(goLogBridge)
+	require.True(t, ok, "SlogHandler should return go-log's bridge")
+
+	// But slog.Default() should NOT be go-log's bridge (should remain stdlib default)
+	defaultHandler := slog.Default().Handler()
+	_, ok = defaultHandler.(goLogBridge)
+	require.False(t, ok, "slog.Default() should not be go-log's bridge when capture is disabled")
+}
+
+func TestSlogHandler_MultipleSetupLogging(t *testing.T) {
+	// First setup
+	SetupLogging(Config{
+		Format: PlaintextOutput,
+		Stderr: true,
+		Level:  LevelError,
+	})
+	handler1 := SlogHandler()
+	require.NotNil(t, handler1)
+
+	// Second setup with different config
+	SetupLogging(Config{
+		Format: JSONOutput,
+		Stderr: true,
+		Level:  LevelDebug,
+	})
+	handler2 := SlogHandler()
+	require.NotNil(t, handler2)
+
+	// Handler should be updated (different instance)
+	// We can't directly compare handlers, but we can verify both are valid
+	type goLogBridge interface {
+		GoLogBridge()
+	}
+	_, ok := handler2.(goLogBridge)
+	require.True(t, ok, "Handler should still be valid after multiple SetupLogging calls")
+}
+
+func TestSlogHandler_Concurrent(t *testing.T) {
+	// Test thread-safety: multiple goroutines calling SlogHandler() concurrently
+	const goroutines = 100
+	const iterations = 100
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				handler := SlogHandler()
+				require.NotNil(t, handler, "SlogHandler should always return non-nil")
+
+				// Verify it's a valid handler
+				type goLogBridge interface {
+					GoLogBridge()
+				}
+				_, ok := handler.(goLogBridge)
+				require.True(t, ok, "Handler should be valid go-log bridge")
+			}
+		}()
+	}
+
+	wg.Wait()
 }

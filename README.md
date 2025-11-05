@@ -302,26 +302,18 @@ log.Info("started service", "addr", addr)
 
 ```go
 import (
-    "log/slog"
+    golog "github.com/ipfs/go-log/v2"
     "github.com/libp2p/go-libp2p/gologshim"
 )
 
 func init() {
-    // go-log installs its bridge via slog.SetDefault() when SetupLogging() is called
-    // (unless disabled via GOLOG_CAPTURE_DEFAULT_SLOG=false)
-    handler := slog.Default().Handler()
-
-    // Optional: verify it's go-log's bridge via duck typing
-    type goLogBridge interface {
-        GoLogBridge()
-    }
-    if _, ok := handler.(goLogBridge); !ok {
-        panic("aborting startup: slog.Default() is not go-log's bridge, logs would be missing due to incorrect wiring")
-    }
-
-    gologshim.SetDefaultHandler(handler)
+    // Use go-log's SlogHandler() to get the bridge directly.
+    // This works even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+    gologshim.SetDefaultHandler(golog.SlogHandler())
 }
 ```
+
+**Note**: By default, go-log automatically installs its bridge as `slog.Default()` on import (via init). This means `slog.Default().Handler()` returns the same handler as `golog.SlogHandler()`. However, if you disable automatic installation via `GOLOG_CAPTURE_DEFAULT_SLOG=false`, you can still use `golog.SlogHandler()` to explicitly wire slog-based libraries to go-log.
 
 **Tradeoff**: Approach 2 requires manual coordination in every application, while Approach 1 works automatically. However, Approach 2 is more explicit about dependencies.
 

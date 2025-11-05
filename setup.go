@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mattn/go-isatty"
 	"go.uber.org/zap"
@@ -97,6 +98,12 @@ var primaryCore zapcore.Core
 // loggerCore is the base for all loggers created by this package
 var loggerCore = &lockedMultiCore{}
 
+// slogBridge is go-log's slog.Handler that routes slog logs through zap.
+// It's always created during SetupLogging, even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+// This allows applications to explicitly wire slog-based libraries (like go-libp2p)
+// to go-log using SlogHandler(), regardless of whether it's installed as slog.Default().
+var slogBridge atomic.Pointer[slog.Handler]
+
 // GetConfig returns a copy of the saved config. It can be inspected, modified,
 // and re-applied using a subsequent call to SetupLogging().
 func GetConfig() Config {
@@ -159,16 +166,44 @@ func SetupLogging(cfg Config) {
 		}
 	}
 
-	// Enable slog integration by default (unless explicitly disabled via GOLOG_CAPTURE_DEFAULT_SLOG=false).
-	// This allows libraries using slog (like go-libp2p) to automatically use go-log's formatting
-	// and dynamic level control.
+	// Create the slog bridge (always available via SlogHandler()).
+	// This allows applications to explicitly wire slog-based libraries to go-log
+	// even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+	bridge := newZapToSlogBridge(loggerCore)
+	slogBridge.Store(&bridge)
+
+	// Install the bridge as slog.Default() unless explicitly disabled.
+	// When enabled, libraries using slog automatically use go-log's formatting.
+	// Libraries can also opt-in to dynamic per-logger level control if they include "logger" attribute.
 	if os.Getenv(envCaptureSlog) != "false" {
-		captureSlog(loggerCore)
+		captureSlogDefault(bridge)
 	}
 }
 
-// captureSlog is the internal implementation that routes slog logs through go-log's zap core
-func captureSlog(core zapcore.Core) {
+// SlogHandler returns go-log's slog.Handler for explicit wiring.
+// This allows applications to connect slog-based libraries to go-log
+// even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+//
+// Example usage in an application's init():
+//
+//	import (
+//	    golog "github.com/ipfs/go-log/v2"
+//	    "github.com/libp2p/go-libp2p/gologshim"
+//	)
+//
+//	func init() {
+//	    gologshim.SetDefaultHandler(golog.SlogHandler())
+//	}
+func SlogHandler() slog.Handler {
+	if h := slogBridge.Load(); h != nil {
+		return *h
+	}
+	// Should never happen since SetupLogging() is called in init()
+	panic("go-log: SlogHandler called before SetupLogging")
+}
+
+// captureSlogDefault installs go-log's slog bridge as slog.Default()
+func captureSlogDefault(bridge slog.Handler) {
 	// Check if slog.Default() is already customized (not stdlib default)
 	// and warn the user that we're replacing it
 	defaultHandler := slog.Default().Handler()
@@ -183,7 +218,6 @@ func captureSlog(core zapcore.Core) {
 		}
 	}
 
-	bridge := newZapToSlogBridge(core)
 	slog.SetDefault(slog.New(bridge))
 }
 
