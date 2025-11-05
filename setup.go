@@ -181,17 +181,25 @@ func SetupLogging(cfg Config) {
 }
 
 // SlogHandler returns go-log's slog.Handler for explicit wiring.
-// This allows applications to connect slog-based libraries to go-log
-// even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+// This allows applications to integrate slog-based logging with go-log's
+// formatting and level control.
 //
 // Example usage in an application's init():
 //
 //	import (
+//	    "log/slog"
 //	    golog "github.com/ipfs/go-log/v2"
 //	    "github.com/libp2p/go-libp2p/gologshim"
 //	)
 //
 //	func init() {
+//	    // Set go-log's slog handler as the application-wide default.
+//	    // This ensures all slog-based logging uses go-log's formatting.
+//	    slog.SetDefault(slog.New(golog.SlogHandler()))
+//
+//	    // Wire go-log's slog bridge to go-libp2p's gologshim.
+//	    // This provides go-libp2p loggers with the "logger" attribute
+//	    // for per-subsystem level control.
 //	    gologshim.SetDefaultHandler(golog.SlogHandler())
 //	}
 func SlogHandler() slog.Handler {
