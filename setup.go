@@ -39,7 +39,7 @@ const (
 
 	envLoggingOutput = "GOLOG_OUTPUT"               // possible values: stdout|stderr|file combine multiple values with '+'
 	envLoggingLabels = "GOLOG_LOG_LABELS"           // comma-separated key-value pairs, i.e. "app=example_app,dc=sjc-1"
-	envCaptureSlog   = "GOLOG_CAPTURE_DEFAULT_SLOG" // set to "false" to disable routing slog logs through go-log's zap core
+	envCaptureSlog   = "GOLOG_CAPTURE_DEFAULT_SLOG" // set to "true" to enable routing slog logs through go-log's zap core
 )
 
 type LogFormat int
@@ -168,14 +168,14 @@ func SetupLogging(cfg Config) {
 
 	// Create the slog bridge (always available via SlogHandler()).
 	// This allows applications to explicitly wire slog-based libraries to go-log
-	// even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+	// regardless of GOLOG_CAPTURE_DEFAULT_SLOG setting.
 	bridge := newZapToSlogBridge(loggerCore)
 	slogBridge.Store(&bridge)
 
-	// Install the bridge as slog.Default() unless explicitly disabled.
+	// Install the bridge as slog.Default() if explicitly enabled.
 	// When enabled, libraries using slog automatically use go-log's formatting.
 	// Libraries can also opt-in to dynamic per-logger level control if they include "logger" attribute.
-	if os.Getenv(envCaptureSlog) != "false" {
+	if os.Getenv(envCaptureSlog) == "true" {
 		captureSlogDefault(bridge)
 	}
 }
@@ -214,7 +214,9 @@ func captureSlogDefault(bridge slog.Handler) {
 		handlerType := fmt.Sprintf("%T", defaultHandler)
 		if !strings.Contains(handlerType, "slog.defaultHandler") &&
 			!strings.Contains(handlerType, "slog.commonHandler") {
-			fmt.Fprintf(os.Stderr, "WARN: go-log is replacing custom slog.Default() handler (%s). Set GOLOG_CAPTURE_DEFAULT_SLOG=false to prevent this.\n", handlerType)
+
+			fmt.Fprintf(os.Stderr, "WARN: go-log is overriding custom slog.Default() handler (%s) to ensure logs from slog-based libraries are captured and formatted consistently. This prevents missing logs or stderr pollution. Set GOLOG_CAPTURE_DEFAULT_SLOG=false to disable this behavior.\n", handlerType)
+
 		}
 	}
 

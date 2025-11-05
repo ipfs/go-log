@@ -3,20 +3,20 @@
 [![](https://img.shields.io/badge/project-IPFS-blue.svg?style=flat-square)](https://ipfs.io/)
 [![GoDoc](https://pkg.go.dev/badge/github.com/ipfs/go-log/v2.svg)](https://pkg.go.dev/github.com/ipfs/go-log/v2)
 
-> The logging library used by go-ipfs with Go's log/slog support
+> The logging library used by IPFS Kubo
 
-go-log wraps [zap](https://github.com/uber-go/zap) to provide a logging facade. go-log manages logging
-instances and allows for their levels to be controlled individually. It includes a bridge to Go's native log/slog package for unified logging across IPFS/libp2p components.
+go-log wraps [zap](https://github.com/uber-go/zap) to provide per-subsystem level control and optional log/slog integration for unified logging across IPFS/libp2p components.
 
 ## Table of Contents
 
 - [Install](#install)
 - [Usage](#usage)
-  - [Environment Variables](#environment-variables)
-  - [Slog Integration](#slog-integration)
-    - [For library authors](#for-library-authors)
-      - [Approach 1: Duck-typing detection (automatic)](#approach-1-duck-typing-detection-automatic)
-      - [Approach 2: Explicit handler passing (manual)](#approach-2-explicit-handler-passing-manual)
+- [Environment Variables](#environment-variables)
+- [Slog Integration](#slog-integration)
+  - [Application Setup (Required)](#application-setup-required)
+  - [For library authors](#for-library-authors)
+    - [Approach 1: Duck-typing detection (automatic)](#approach-1-duck-typing-detection-automatic)
+    - [Approach 2: Explicit handler passing (manual)](#approach-2-explicit-handler-passing-manual)
 - [Contribute](#contribute)
 - [License](#license)
 
@@ -64,7 +64,7 @@ if err != nil {
 }
 ```
 
-### Environment Variables
+## Environment Variables
 
 This package can be configured through various environment variables.
 
@@ -135,17 +135,19 @@ export GOLOG_LOG_LABELS="app=example_app,dc=sjc-1"
 
 #### `GOLOG_CAPTURE_DEFAULT_SLOG`
 
-When `SetupLogging()` is called, go-log automatically routes slog logs through its zap core for consistent formatting and dynamic level control (unless explicitly disabled). This means libraries using `slog` (like go-libp2p) will automatically use go-log's formatting and respect dynamic level changes (e.g., via `ipfs log level` commands).
+By default, go-log does NOT automatically install its slog handler as `slog.Default()`. Applications should explicitly call `slog.SetDefault(slog.New(golog.SlogHandler()))` for slog integration (see Slog Integration section below).
 
-To disable this behavior and keep `slog.Default()` unchanged, set:
+Alternatively, you can enable automatic installation by setting:
 
 ```bash
-export GOLOG_CAPTURE_DEFAULT_SLOG="false"
+export GOLOG_CAPTURE_DEFAULT_SLOG="true"
 ```
 
-### Slog Integration
+When enabled, go-log automatically installs its handler as `slog.Default()` during `SetupLogging()`, which allows libraries using `slog` to automatically use go-log's formatting and dynamic level control.
 
-go-log automatically integrates with Go's `log/slog` package when `SetupLogging()` is called. This provides:
+## Slog Integration
+
+go-log provides integration with Go's `log/slog` package for unified log management. This provides:
 
 1. **Unified formatting**: slog logs use the same format as go-log (color/nocolor/json)
 2. **Dynamic level control**: slog loggers respect `SetLogLevel()` and environment variables
@@ -153,9 +155,35 @@ go-log automatically integrates with Go's `log/slog` package when `SetupLogging(
 
 **Note**: This slog bridge exists as an intermediate solution while go-log uses zap internally. In the future, go-log may migrate from zap to native slog, which would simplify this integration.
 
-#### How it works
+### Application Setup (Required)
 
-When go-log is present in an application, slog-based libraries (like go-libp2p) can integrate with it to gain unified formatting and dynamic level control.
+For slog-based logging to use go-log's formatting and level control, applications must explicitly set go-log's handler as the slog default:
+
+```go
+import (
+	"log/slog"
+	golog "github.com/ipfs/go-log/v2"
+	"github.com/libp2p/go-libp2p/gologshim"
+)
+
+func init() {
+	// Set go-log's handler as the application-wide slog default.
+	// This ensures all slog-based logging uses go-log's formatting.
+	slog.SetDefault(slog.New(golog.SlogHandler()))
+
+	// Wire libraries that use explicit handler passing (like go-libp2p).
+	// This ensures proper subsystem attribution for per-logger level control.
+	gologshim.SetDefaultHandler(golog.SlogHandler())
+}
+```
+
+This two-layer approach ensures:
+- **Application-level**: All slog usage (application code + libraries) flows through go-log
+- **Library-level**: Libraries with explicit wiring (like go-libp2p) include proper subsystem attributes
+
+### How it works
+
+When configured as shown above, slog-based libraries gain unified formatting and dynamic level control.
 
 **Attributes added by libraries:**
 - `logger`: Subsystem name (e.g., "foo", "bar", "baz")
@@ -179,7 +207,7 @@ When integrated with go-log, output is formatted by go-log (JSON format shown he
 }
 ```
 
-#### Controlling slog logger levels
+### Controlling slog logger levels
 
 These loggers respect go-log's level configuration:
 
@@ -193,7 +221,7 @@ logging.SetLogLevel("foo", "debug")
 
 This works even if the logger is created lazily or hasn't been created yet. Level settings are preserved and applied when the logger is first used.
 
-#### Direct slog usage without subsystem
+### Direct slog usage without subsystem
 
 When using slog.Default() directly without adding a "logger" attribute, logs still work but have limitations:
 
@@ -218,7 +246,7 @@ log.Info("message")  // LoggerName = "foo", uses subsystem level
 
 For libraries, use the "logger" attribute pattern to enable per-subsystem control.
 
-#### Why "logger" attribute?
+### Why "logger" attribute?
 
 go-log uses `"logger"` as the attribute key for subsystem names to maintain backward compatibility with its existing Zap-based output format:
 
@@ -228,11 +256,11 @@ go-log uses `"logger"` as the attribute key for subsystem names to maintain back
 
 Libraries integrating with go-log should use this same attribute key to ensure proper subsystem-aware level control.
 
-#### For library authors
+### For library authors
 
 Libraries using slog can integrate with go-log without adding go-log as a dependency. There are two approaches:
 
-##### Approach 1: Duck-typing detection (automatic)
+#### Approach 1: Duck-typing detection (automatic)
 
 Detect go-log's slog bridge via an interface marker to avoid requiring go-log in library's go.mod:
 
@@ -240,8 +268,7 @@ Detect go-log's slog bridge via an interface marker to avoid requiring go-log in
 // In your library's logging package
 func Logger(subsystem string) *slog.Logger {
     // Check if slog.Default() is go-log's bridge.
-    // go-log automatically installs its bridge via slog.SetDefault() when
-    // SetupLogging() is called (unless disabled via GOLOG_CAPTURE_DEFAULT_SLOG=false).
+    // This works when applications call slog.SetDefault(slog.New(golog.SlogHandler())).
     handler := slog.Default().Handler()
 
     type goLogBridge interface {
@@ -266,9 +293,9 @@ var log = mylib.Logger("foo")
 log.Debug("operation completed", "key", value)
 ```
 
-This pattern allows libraries to automatically integrate when go-log is present, without requiring coordination from the application.
+This pattern allows libraries to automatically integrate when the application has set up go-log's handler, without requiring go-log as a dependency.
 
-##### Approach 2: Explicit handler passing (manual)
+#### Approach 2: Explicit handler passing (manual)
 
 Alternatively, expose a way for applications to provide a handler explicitly:
 
@@ -308,26 +335,26 @@ import (
 
 func init() {
     // Use go-log's SlogHandler() to get the bridge directly.
-    // This works even when GOLOG_CAPTURE_DEFAULT_SLOG=false.
+    // This works regardless of GOLOG_CAPTURE_DEFAULT_SLOG setting.
     gologshim.SetDefaultHandler(golog.SlogHandler())
 }
 ```
 
-**Note**: By default, go-log automatically installs its bridge as `slog.Default()` on import (via init). This means `slog.Default().Handler()` returns the same handler as `golog.SlogHandler()`. However, if you disable automatic installation via `GOLOG_CAPTURE_DEFAULT_SLOG=false`, you can still use `golog.SlogHandler()` to explicitly wire slog-based libraries to go-log.
-
-**Tradeoff**: Approach 2 requires manual coordination in every application, while Approach 1 works automatically. However, Approach 2 is more explicit about dependencies.
+**Tradeoff**: Approach 2 requires manual coordination in every application, while Approach 1 works automatically when applications set up `slog.Default()`.
 
 For a complete example, see [go-libp2p's gologshim](https://github.com/libp2p/go-libp2p/blob/master/gologshim/gologshim.go).
 
-#### Disabling slog integration
+### Enabling automatic slog capture (opt-in)
 
-To disable automatic slog integration and keep `slog.Default()` unchanged:
+**Note**: This is mostly used during development, when a library author decides between Approach 1 or 2 for proper (subsystem-aware) integration with go-log.
+
+You can enable automatic installation of go-log's handler during `SetupLogging()`:
 
 ```bash
-export GOLOG_CAPTURE_DEFAULT_SLOG="false"
+export GOLOG_CAPTURE_DEFAULT_SLOG="true"
 ```
 
-When disabled, go-libp2p's gologshim will create its own slog handlers that write to stderr.
+When enabled, go-log automatically installs its handler as `slog.Default()`, which allows slog-based libraries to automatically use go-log's formatting without explicit application setup.
 
 ## Contribute
 

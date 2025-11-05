@@ -23,7 +23,7 @@ func TestSlogInterop(t *testing.T) {
 	originalDefault := slog.Default()
 	defer slog.SetDefault(originalDefault)
 
-	t.Run("enabled by default", func(t *testing.T) {
+	t.Run("disabled by default", func(t *testing.T) {
 		beforeSetup := slog.Default()
 
 		cfg := Config{
@@ -34,20 +34,20 @@ func TestSlogInterop(t *testing.T) {
 
 		SetupLogging(cfg)
 
-		// slog.Default should have changed automatically
-		if slog.Default() == beforeSetup {
-			t.Error("slog.Default() should be automatically set by SetupLogging")
+		// slog.Default should NOT have changed automatically
+		if slog.Default() != beforeSetup {
+			t.Error("slog.Default() should NOT be automatically set by SetupLogging")
 		}
 
-		// Test that slog logs work
+		// Test that slog logs still work via SlogHandler()
 		slog.Info("test message", "key", "value")
 	})
 
-	t.Run("disabled via GOLOG_CAPTURE_DEFAULT_SLOG=false", func(t *testing.T) {
+	t.Run("enabled via GOLOG_CAPTURE_DEFAULT_SLOG=true", func(t *testing.T) {
 		beforeSetup := slog.Default()
 
-		// Set env var to disable
-		os.Setenv("GOLOG_CAPTURE_DEFAULT_SLOG", "false")
+		// Set env var to enable
+		os.Setenv("GOLOG_CAPTURE_DEFAULT_SLOG", "true")
 		defer os.Unsetenv("GOLOG_CAPTURE_DEFAULT_SLOG")
 
 		cfg := Config{
@@ -58,9 +58,9 @@ func TestSlogInterop(t *testing.T) {
 
 		SetupLogging(cfg)
 
-		// slog.Default should NOT have changed
-		if slog.Default() != beforeSetup {
-			t.Error("slog.Default() should not be modified when GOLOG_CAPTURE_DEFAULT_SLOG=false")
+		// slog.Default should have changed
+		if slog.Default() == beforeSetup {
+			t.Error("slog.Default() should be modified when GOLOG_CAPTURE_DEFAULT_SLOG=true")
 		}
 	})
 }
@@ -311,6 +311,9 @@ func TestPipeReaderCapturesSlogLogs(t *testing.T) {
 		Stdout: false,
 	})
 
+	// Explicitly set go-log's handler as slog.Default
+	slog.SetDefault(slog.New(SlogHandler()))
+
 	// Set levels for both subsystems
 	SetLogLevel("test-native", "debug")
 	SetLogLevel("test-slog", "debug")
@@ -375,13 +378,16 @@ func createGologshimStyleLogger(system string) *slog.Logger {
 }
 
 func TestPipeReaderCapturesGologshimStyleLogs(t *testing.T) {
-	// Setup go-log (this installs the slog bridge to slog.Default())
+	// Setup go-log
 	SetupLogging(Config{
 		Format: JSONOutput,
 		Level:  LevelError,
 		Stderr: false,
 		Stdout: false,
 	})
+
+	// Explicitly set go-log's handler as slog.Default
+	slog.SetDefault(slog.New(SlogHandler()))
 
 	// Verify slog.Default() has the bridge
 	if _, ok := slog.Default().Handler().(goLogBridge); !ok {

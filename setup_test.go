@@ -345,17 +345,18 @@ func TestSlogHandler_MatchesSlogDefault(t *testing.T) {
 	originalDefault := slog.Default()
 	defer slog.SetDefault(originalDefault)
 
-	// Reset environment
-	os.Unsetenv(envCaptureSlog)
+	// Enable automatic capture
+	os.Setenv(envCaptureSlog, "true")
+	defer os.Unsetenv(envCaptureSlog)
 
-	// Setup with capture enabled (default)
+	// Setup with capture enabled
 	SetupLogging(Config{
 		Format: PlaintextOutput,
 		Stderr: true,
 		Level:  LevelError,
 	})
 
-	// SlogHandler and slog.Default().Handler() should be the same
+	// SlogHandler and slog.Default().Handler() should be the same when capture is enabled
 	handler := SlogHandler()
 	defaultHandler := slog.Default().Handler()
 
@@ -373,7 +374,7 @@ func TestSlogHandler_MatchesSlogDefault(t *testing.T) {
 	require.True(t, ok, "slog.Default().Handler() should implement GoLogBridge marker when capture is enabled")
 }
 
-func TestSlogHandler_WorksWhenCaptureDisabled(t *testing.T) {
+func TestSlogHandler_WorksWithoutAutomaticCapture(t *testing.T) {
 	// Save original slog.Default for cleanup
 	originalDefault := slog.Default()
 	defer slog.SetDefault(originalDefault)
@@ -381,11 +382,7 @@ func TestSlogHandler_WorksWhenCaptureDisabled(t *testing.T) {
 	// Reset slog.Default() to stdlib default before testing
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
 
-	// Disable automatic capture
-	os.Setenv(envCaptureSlog, "false")
-	defer os.Unsetenv(envCaptureSlog)
-
-	// Setup with capture disabled
+	// Setup with default behavior (automatic capture disabled by default)
 	SetupLogging(Config{
 		Format: PlaintextOutput,
 		Stderr: true,
@@ -394,7 +391,7 @@ func TestSlogHandler_WorksWhenCaptureDisabled(t *testing.T) {
 
 	// SlogHandler should still return a valid handler
 	handler := SlogHandler()
-	require.NotNil(t, handler, "SlogHandler should work even when GOLOG_CAPTURE_DEFAULT_SLOG=false")
+	require.NotNil(t, handler, "SlogHandler should work without automatic capture")
 
 	// Verify it's go-log's bridge
 	type goLogBridge interface {
@@ -403,10 +400,10 @@ func TestSlogHandler_WorksWhenCaptureDisabled(t *testing.T) {
 	_, ok := handler.(goLogBridge)
 	require.True(t, ok, "SlogHandler should return go-log's bridge")
 
-	// But slog.Default() should NOT be go-log's bridge (should remain stdlib default)
+	// But slog.Default() should NOT be go-log's bridge by default (should remain stdlib default)
 	defaultHandler := slog.Default().Handler()
 	_, ok = defaultHandler.(goLogBridge)
-	require.False(t, ok, "slog.Default() should not be go-log's bridge when capture is disabled")
+	require.False(t, ok, "slog.Default() should not be go-log's bridge by default")
 }
 
 func TestSlogHandler_MultipleSetupLogging(t *testing.T) {
