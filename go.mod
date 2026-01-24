@@ -4,8 +4,8 @@ go 1.24
 
 require (
 	github.com/mattn/go-isatty v0.0.20
-	github.com/stretchr/testify v1.10.0
-	go.uber.org/zap v1.27.0
+	github.com/stretchr/testify v1.11.1
+	go.uber.org/zap v1.27.1
 )
 
 require (
