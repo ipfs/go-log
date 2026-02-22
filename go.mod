@@ -1,6 +1,6 @@
 module github.com/ipfs/go-log/v2
 
-go 1.24
+go 1.25
 
 require (
 	github.com/mattn/go-isatty v0.0.20
