@@ -19,6 +19,11 @@ type goLogBridge interface {
 	GoLogBridge()
 }
 
+// logValuerFunc adapts a function to slog.LogValuer for tests.
+type logValuerFunc func() slog.Value
+
+func (f logValuerFunc) LogValue() slog.Value { return f() }
+
 func TestSlogInterop(t *testing.T) {
 	// Save initial state
 	originalDefault := slog.Default()
@@ -279,6 +284,26 @@ func TestSlogGroupConversion(t *testing.T) {
 		}
 		if g["u"] != float64(uint64(1)<<33) {
 			t.Errorf("unexpected uint: %v", g["u"])
+		}
+	})
+
+	t.Run("LogValuer returning group is resolved and rendered", func(t *testing.T) {
+		buf.Reset()
+		logger.Info("msg",
+			slog.Any("user", logValuerFunc(func() slog.Value {
+				return slog.GroupValue(
+					slog.String("name", "alice"),
+					slog.Int("age", 30),
+				)
+			})),
+		)
+		got := decode(t)
+		user, ok := got["user"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected user to be an object, got %T: %v", got["user"], got["user"])
+		}
+		if user["name"] != "alice" || user["age"] != float64(30) {
+			t.Errorf("unexpected user contents: %v", user)
 		}
 	})
 
