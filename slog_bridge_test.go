@@ -3,6 +3,7 @@ package log
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"strings"
@@ -166,6 +167,92 @@ func TestSlogAttrFieldConversions(t *testing.T) {
 	if !strings.Contains(output, "any_key") {
 		t.Error("Any attribute not correctly converted")
 	}
+}
+
+func TestSlogGroupConversion(t *testing.T) {
+	var buf bytes.Buffer
+	ws := zapcore.AddSync(&buf)
+	testCore := newCore(JSONOutput, ws, LevelDebug)
+	logger := slog.New(newZapToSlogBridge(testCore))
+
+	decode := func(t *testing.T) map[string]any {
+		t.Helper()
+		var m map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &m); err != nil {
+			t.Fatalf("invalid JSON output: %v\n%s", err, buf.String())
+		}
+		return m
+	}
+
+	t.Run("nested groups with mixed types", func(t *testing.T) {
+		buf.Reset()
+		logger.Info("msg", slog.Group("outer",
+			slog.String("s", "hello"),
+			slog.Int("n", 42),
+			slog.Bool("b", true),
+			slog.Group("inner", slog.String("k", "v")),
+		))
+		got := decode(t)
+		outer, ok := got["outer"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected outer to be an object, got %T: %v", got["outer"], got["outer"])
+		}
+		if outer["s"] != "hello" || outer["n"] != float64(42) || outer["b"] != true {
+			t.Errorf("unexpected scalar contents: %v", outer)
+		}
+		inner, ok := outer["inner"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected inner to be an object, got %T", outer["inner"])
+		}
+		if inner["k"] != "v" {
+			t.Errorf("unexpected inner contents: %v", inner)
+		}
+	})
+
+	t.Run("fxevent-style synthetic-array group", func(t *testing.T) {
+		// fxevent.slogStrings packs []string as a Group with numeric-string keys.
+		// Without group support this rendered as [{"Key":"0","Value":{}},...].
+		buf.Reset()
+		logger.Info("msg", slog.Group("stacktrace",
+			slog.String("0", "frame0"),
+			slog.String("1", "frame1"),
+		))
+		got := decode(t)
+		st, ok := got["stacktrace"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected stacktrace to be an object, got %T: %v", got["stacktrace"], got["stacktrace"])
+		}
+		if st["0"] != "frame0" || st["1"] != "frame1" {
+			t.Errorf("unexpected stacktrace contents: %v", st)
+		}
+	})
+
+	t.Run("empty-key group is inlined", func(t *testing.T) {
+		buf.Reset()
+		logger.Info("msg", slog.Group("wrap",
+			slog.Group("", slog.String("inlined", "yes")),
+		))
+		got := decode(t)
+		wrap, ok := got["wrap"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected wrap to be an object, got %T", got["wrap"])
+		}
+		if wrap["inlined"] != "yes" {
+			t.Errorf("expected inlined attr at parent level, got: %v", wrap)
+		}
+	})
+
+	t.Run("empty group is skipped", func(t *testing.T) {
+		buf.Reset()
+		logger.Info("msg", slog.Group("ignored"), slog.String("kept", "v"))
+		got := decode(t)
+		if _, present := got["ignored"]; present {
+			t.Errorf("empty group should be omitted, got: %v", got)
+		}
+		if got["kept"] != "v" {
+			t.Errorf("expected sibling attr to survive, got: %v", got)
+		}
+	})
 }
 
 func TestSubsystemAwareLevelControl(t *testing.T) {
