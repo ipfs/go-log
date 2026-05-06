@@ -253,6 +253,52 @@ func TestSlogGroupConversion(t *testing.T) {
 			t.Errorf("expected sibling attr to survive, got: %v", got)
 		}
 	})
+
+	t.Run("group with time, duration, float, uint", func(t *testing.T) {
+		buf.Reset()
+		when := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+		logger.Info("msg", slog.Group("g",
+			slog.Time("t", when),
+			slog.Duration("d", 1500*time.Millisecond),
+			slog.Float64("f", 2.5),
+			slog.Uint64("u", uint64(1)<<33),
+		))
+		got := decode(t)
+		g, ok := got["g"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected g to be an object, got %T: %v", got["g"], got["g"])
+		}
+		if g["t"] != "2025-01-02T03:04:05.000Z" {
+			t.Errorf("unexpected time: %v", g["t"])
+		}
+		if g["d"] != 1.5 {
+			t.Errorf("unexpected duration: %v", g["d"])
+		}
+		if g["f"] != 2.5 {
+			t.Errorf("unexpected float: %v", g["f"])
+		}
+		if g["u"] != float64(uint64(1)<<33) {
+			t.Errorf("unexpected uint: %v", g["u"])
+		}
+	})
+
+	t.Run("top-level empty-key group inlines into record", func(t *testing.T) {
+		buf.Reset()
+		logger.Info("msg", slog.Group("",
+			slog.String("inlined", "yes"),
+			slog.Int("n", 7),
+		))
+		got := decode(t)
+		if got["inlined"] != "yes" {
+			t.Errorf("expected inlined string at record level: %v", got)
+		}
+		if got["n"] != float64(7) {
+			t.Errorf("expected inlined int at record level: %v", got)
+		}
+		if _, present := got[""]; present {
+			t.Errorf("empty-key group should not produce an empty-key field, got: %v", got)
+		}
+	})
 }
 
 func TestSubsystemAwareLevelControl(t *testing.T) {

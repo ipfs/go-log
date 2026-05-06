@@ -241,6 +241,10 @@ func slogAttrToZapField(attr slog.Attr) zapcore.Field {
 			// slog: a Group with no Attrs is ignored.
 			return zap.Skip()
 		}
+		if key == "" {
+			// slog: a Group with an empty key is inlined into its parent.
+			return zap.Inline(slogGroup(g))
+		}
 		return zap.Object(key, slogGroup(g))
 	case slog.KindAny:
 		return zapcore.Field{Key: key, Type: zapcore.ReflectType, Interface: value.Any()}
@@ -268,6 +272,8 @@ func (g slogGroup) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+// addSlogAttrToObjectEncoder mirrors slogAttrToZapField for nested object
+// encoding; keep the two switches in sync when adding new slog.Kind cases.
 func addSlogAttrToObjectEncoder(enc zapcore.ObjectEncoder, attr slog.Attr) {
 	key := attr.Key
 	value := attr.Value
