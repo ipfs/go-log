@@ -76,6 +76,7 @@ func (h *subsystemAwareHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 }
 
+// TODO: same no-op as zapToSlogBridge.WithGroup; see TODO there.
 func (h *subsystemAwareHandler) WithGroup(name string) slog.Handler {
 	return &subsystemAwareHandler{
 		bridge: &zapToSlogBridge{
@@ -191,9 +192,13 @@ func (h *zapToSlogBridge) WithAttrs(attrs []slog.Attr) slog.Handler {
 }
 
 // WithGroup implements slog.Handler.
+//
+// TODO: Handler.WithGroup is a no-op. Inline slog.Group(...) attrs render as
+// nested objects via slogGroup, but attrs added after a Handler.WithGroup
+// call are not nested under the group name. Full support needs deferred
+// attr conversion plus a group-frame stack walked at Handle time, with the
+// subsystem-key filter applied only at depth 0.
 func (h *zapToSlogBridge) WithGroup(name string) slog.Handler {
-	// Groups are currently not implemented - just return a handler preserving the subsystem.
-	// A more sophisticated implementation would nest fields under the group name.
 	return &zapToSlogBridge{
 		core:          h.core,
 		subsystemName: h.subsystemName, // Preserve subsystem
