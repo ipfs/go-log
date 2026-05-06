@@ -235,11 +235,65 @@ func slogAttrToZapField(attr slog.Attr) zapcore.Field {
 		return zapcore.Field{Key: key, Type: zapcore.DurationType, Integer: value.Duration().Nanoseconds()}
 	case slog.KindTime:
 		return zapcore.Field{Key: key, Type: zapcore.TimeType, Integer: value.Time().UnixNano(), Interface: value.Time().Location()}
+	case slog.KindGroup:
+		g := value.Group()
+		if len(g) == 0 {
+			// slog: a Group with no Attrs is ignored.
+			return zap.Skip()
+		}
+		return zap.Object(key, slogGroup(g))
 	case slog.KindAny:
 		return zapcore.Field{Key: key, Type: zapcore.ReflectType, Interface: value.Any()}
 	default:
 		// Fallback for complex types
 		return zapcore.Field{Key: key, Type: zapcore.ReflectType, Interface: value.Any()}
+	}
+}
+
+// slogGroup adapts a slog group's attrs as a zapcore.ObjectMarshaler so nested
+// fields render as a structured object rather than reflected []slog.Attr.
+type slogGroup []slog.Attr
+
+func (g slogGroup) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	for _, attr := range g {
+		// slog inlines a Group whose key is empty into the enclosing object.
+		if attr.Key == "" && attr.Value.Kind() == slog.KindGroup {
+			if err := slogGroup(attr.Value.Group()).MarshalLogObject(enc); err != nil {
+				return err
+			}
+			continue
+		}
+		addSlogAttrToObjectEncoder(enc, attr)
+	}
+	return nil
+}
+
+func addSlogAttrToObjectEncoder(enc zapcore.ObjectEncoder, attr slog.Attr) {
+	key := attr.Key
+	value := attr.Value
+	switch value.Kind() {
+	case slog.KindString:
+		enc.AddString(key, value.String())
+	case slog.KindInt64:
+		enc.AddInt64(key, value.Int64())
+	case slog.KindUint64:
+		enc.AddUint64(key, value.Uint64())
+	case slog.KindFloat64:
+		enc.AddFloat64(key, value.Float64())
+	case slog.KindBool:
+		enc.AddBool(key, value.Bool())
+	case slog.KindDuration:
+		enc.AddDuration(key, value.Duration())
+	case slog.KindTime:
+		enc.AddTime(key, value.Time())
+	case slog.KindGroup:
+		g := value.Group()
+		if len(g) == 0 {
+			return
+		}
+		_ = enc.AddObject(key, slogGroup(g))
+	default:
+		_ = enc.AddReflected(key, value.Any())
 	}
 }
 
