@@ -218,7 +218,8 @@ func slogLevelToZap(level slog.Level) zapcore.Level {
 // slogAttrToZapField converts slog.Attr to zapcore.Field.
 func slogAttrToZapField(attr slog.Attr) zapcore.Field {
 	key := attr.Key
-	value := attr.Value
+	// slog: handlers must resolve LogValuer at the leaf.
+	value := attr.Value.Resolve()
 
 	switch value.Kind() {
 	case slog.KindString:
@@ -260,14 +261,15 @@ type slogGroup []slog.Attr
 
 func (g slogGroup) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	for _, attr := range g {
+		v := attr.Value.Resolve()
 		// slog inlines a Group whose key is empty into the enclosing object.
-		if attr.Key == "" && attr.Value.Kind() == slog.KindGroup {
-			if err := slogGroup(attr.Value.Group()).MarshalLogObject(enc); err != nil {
+		if attr.Key == "" && v.Kind() == slog.KindGroup {
+			if err := slogGroup(v.Group()).MarshalLogObject(enc); err != nil {
 				return err
 			}
 			continue
 		}
-		addSlogAttrToObjectEncoder(enc, attr)
+		addSlogAttrToObjectEncoder(enc, slog.Attr{Key: attr.Key, Value: v})
 	}
 	return nil
 }
@@ -276,7 +278,8 @@ func (g slogGroup) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 // encoding; keep the two switches in sync when adding new slog.Kind cases.
 func addSlogAttrToObjectEncoder(enc zapcore.ObjectEncoder, attr slog.Attr) {
 	key := attr.Key
-	value := attr.Value
+	// slog: handlers must resolve LogValuer at the leaf.
+	value := attr.Value.Resolve()
 	switch value.Kind() {
 	case slog.KindString:
 		enc.AddString(key, value.String())
