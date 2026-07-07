@@ -50,7 +50,7 @@ func TestLogToFileAndStderr(t *testing.T) {
 	}()
 
 	// setup file
-	logfile, err := os.CreateTemp("", "go-log-test")
+	logfile, err := os.CreateTemp(t.TempDir(), "go-log-test")
 	require.NoError(t, err)
 	defer os.Remove(logfile.Name())
 
@@ -84,7 +84,7 @@ func TestLogToFileAndStderr(t *testing.T) {
 
 func TestLogToFile(t *testing.T) {
 	// get tmp log file
-	logfile, err := os.CreateTemp("", "go-log-test")
+	logfile, err := os.CreateTemp(t.TempDir(), "go-log-test")
 	require.NoError(t, err)
 	defer os.Remove(logfile.Name())
 
