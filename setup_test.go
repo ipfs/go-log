@@ -52,14 +52,13 @@ func TestLogToFileAndStderr(t *testing.T) {
 	// setup file
 	logfile, err := os.CreateTemp(t.TempDir(), "go-log-test")
 	require.NoError(t, err)
+	require.NoError(t, logfile.Close())
 	defer os.Remove(logfile.Name())
 
-	os.Setenv(envLoggingFile, logfile.Name())
-	defer os.Unsetenv(envLoggingFile)
+	t.Setenv(envLoggingFile, logfile.Name())
 
 	// set log output env var
-	os.Setenv(envLoggingOutput, "file+stderr")
-	defer os.Unsetenv(envLoggingOutput)
+	t.Setenv(envLoggingOutput, "file+stderr")
 
 	SetupLogging(configFromEnv())
 
@@ -86,11 +85,11 @@ func TestLogToFile(t *testing.T) {
 	// get tmp log file
 	logfile, err := os.CreateTemp(t.TempDir(), "go-log-test")
 	require.NoError(t, err)
+	require.NoError(t, logfile.Close())
 	defer os.Remove(logfile.Name())
 
 	// set the go-log file env var
-	os.Setenv(envLoggingFile, logfile.Name())
-	defer os.Unsetenv(envLoggingFile)
+	t.Setenv(envLoggingFile, logfile.Name())
 
 	SetupLogging(configFromEnv())
 
@@ -118,8 +117,7 @@ func TestLogLabels(t *testing.T) {
 	}()
 
 	// set the go-log labels env var
-	os.Setenv(envLoggingLabels, "dc=sjc-1,foobar") // foobar to ensure we don't panic on bad input.
-	defer os.Unsetenv(envLoggingLabels)
+	t.Setenv(envLoggingLabels, "dc=sjc-1,foobar") // foobar to ensure we don't panic on bad input.
 	SetupLogging(configFromEnv())
 
 	log := getLogger("test")
@@ -147,8 +145,7 @@ func TestSubsystemLevels(t *testing.T) {
 	}()
 
 	// set the go-log labels env var
-	os.Setenv(envLogging, "info,test1=debug")
-	defer os.Unsetenv(envLoggingLabels)
+	t.Setenv(envLogging, "info,test1=debug")
 	SetupLogging(configFromEnv())
 
 	log1 := getLogger("test1")
@@ -234,8 +231,7 @@ func TestLogToStderrAndStdout(t *testing.T) {
 		os.Stdout = stdout
 	}()
 
-	os.Setenv(envLoggingOutput, "stdout+stderr")
-	defer os.Unsetenv(envLoggingOutput)
+	t.Setenv(envLoggingOutput, "stdout+stderr")
 
 	SetupLogging(configFromEnv())
 
@@ -275,8 +271,7 @@ func TestLogToStdoutOnly(t *testing.T) {
 		os.Stdout = stdout
 	}()
 
-	os.Setenv(envLoggingOutput, "stdout")
-	defer os.Unsetenv(envLoggingOutput)
+	t.Setenv(envLoggingOutput, "stdout")
 
 	SetupLogging(configFromEnv())
 
@@ -346,8 +341,7 @@ func TestSlogHandler_MatchesSlogDefault(t *testing.T) {
 	defer slog.SetDefault(originalDefault)
 
 	// Enable automatic capture
-	os.Setenv(envCaptureSlog, "true")
-	defer os.Unsetenv(envCaptureSlog)
+	t.Setenv(envCaptureSlog, "true")
 
 	// Setup with capture enabled
 	SetupLogging(Config{
