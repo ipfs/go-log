@@ -283,7 +283,9 @@ func SetLogLevel(name, level string) error {
 	// wildcard, change all
 	if name == "*" {
 		SetAllLoggers(lvl)
+		loggerMutex.Lock()
 		defaultLevel = lvl
+		loggerMutex.Unlock()
 		return nil
 	}
 
