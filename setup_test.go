@@ -461,3 +461,23 @@ func TestSlogHandler_Concurrent(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestSetLogLevelConcurrentWildcard(t *testing.T) {
+	numCalls := 100
+	wg := sync.WaitGroup{}
+	wg.Add(numCalls)
+
+	for i := 0; i < numCalls; i++ {
+		go func(idx int) {
+			defer wg.Done()
+
+			lvl := "debug"
+			if idx%2 == 0 {
+				lvl = "info"
+			}
+			_ = SetLogLevel("*", lvl)
+		}(i)
+	}
+
+	wg.Wait()
+}
